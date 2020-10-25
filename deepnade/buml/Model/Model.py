@@ -5,6 +5,7 @@ from Utils.theano_helpers import floatX
 
 
 class Model(object):
+
     def __init__(self):
         self.parameters = dict()
         self.parameters_to_optimise = list()
@@ -18,7 +19,8 @@ class Model(object):
             self.__getattribute__("parameters")
         except AttributeError:
             self.parameters = dict()
-            # This should actually be a property of the trainingmethod, not of the model, but I'll do it like this now
+            # This should actually be a property of the trainingmethod, not of the
+            # model, but I'll do it like this now
             self.parameters_to_optimise = list()
             self.parameters_to_regularise = list()
         self.parameters[parameter.name] = parameter
@@ -36,7 +38,8 @@ class Model(object):
         Returns a hash with an entry per parameter, where the entry key is the parameter name and its value is a serialization of its value
         suitable for storing in an HDF5 file
         """
-        params = dict([(name, parameter.get_value()) for name, parameter in self.parameters.iteritems()])
+        params = dict([(name, parameter.get_value())
+                       for name, parameter in self.parameters.iteritems()])
         params["__class__"] = self.__class__.__name__
         return params
 
@@ -58,7 +61,8 @@ class Model(object):
         for param in self.get_parameters_to_optimise():
             param_v = self.get_parameter(param).get_value()
             param_type = param_v.dtype
-            v[param] = theano.shared(np.zeros_like(param_v, dtype=floatX) + np.asarray([k], dtype=param_type), name + "_" + str(param))
+            v[param] = theano.shared(np.zeros_like(
+                param_v, dtype=floatX) + np.asarray([k], dtype=param_type), name + "_" + str(param))
         return v
 
     def finite_diff_gradients(self, f, delta=1e-6):
@@ -88,6 +92,7 @@ class Model(object):
 
 
 class CompositeModel(Model):
+
     def __init__(self):
         super(CompositeModel, self).__init__()
         self.models = dict()
@@ -109,7 +114,8 @@ class CompositeModel(Model):
         Returns a hash with an entry per parameter and submodel (recursively), where the entry key is the parameter name and its value is a serialization of its value
         suitable for storing in an HDF5 file
         """
-        params = dict([(name, parameter.get_value()) for name, parameter in self.parameters.iteritems()])
+        params = dict([(name, parameter.get_value())
+                       for name, parameter in self.parameters.iteritems()])
         params["__class__"] = self.__class__.__name__
         for k, m in self.models.iteritems():
             params[k] = m.get_parameters()
@@ -141,6 +147,7 @@ class CompositeModel(Model):
 
 
 class Parameter(object):
+
     def __init__(self):
         pass
 
@@ -155,6 +162,7 @@ class Parameter(object):
 
 
 class TensorParameter(Parameter):
+
     def __init__(self, name, shape, theano=True, theano_type=floatX):
         self.name = name
         self.shape = shape
@@ -164,13 +172,15 @@ class TensorParameter(Parameter):
     def add_to_model(self, model):
         self.model = model
         if self.theano:
-            setattr(model, self.name, theano.shared(np.zeros(self.shape, dtype=self.theano_type), self.name))
+            setattr(model, self.name, theano.shared(
+                np.zeros(self.shape, dtype=self.theano_type), self.name))
         else:
             setattr(model, self.name, np.zeros(self.shape, dtype=self.theano_type))
 
     def set_value(self, value):
         if self.theano:
-            self.model.__getattribute__(self.name).set_value(np.asarray(value).astype(self.theano_type))
+            self.model.__getattribute__(self.name).set_value(
+                np.asarray(value).astype(self.theano_type))
         else:
             setattr(self.model, self.name, value)
 
@@ -182,6 +192,7 @@ class TensorParameter(Parameter):
 
 
 class ScalarParameter(Parameter):
+
     def __init__(self, name, default_value, theano=True, theano_type=floatX):
         self.name = name
         self.default_value = default_value
@@ -191,13 +202,16 @@ class ScalarParameter(Parameter):
     def add_to_model(self, model):
         self.model = model
         if self.theano:
-            setattr(model, self.name, theano.shared(np.array(self.default_value, dtype=self.theano_type), self.name))
+            setattr(model, self.name, theano.shared(
+                np.array(self.default_value, dtype=self.theano_type), self.name))
         else:
-            setattr(model, self.name, np.array(self.default_value, dtype=self.theano_type))
+            setattr(model, self.name, np.array(
+                self.default_value, dtype=self.theano_type))
 
     def set_value(self, value):
         if self.theano:
-            self.model.__getattribute__(self.name).set_value(np.asarray(value).astype(floatX))
+            self.model.__getattribute__(self.name).set_value(
+                np.asarray(value).astype(floatX))
         else:
             setattr(self.model, self.name, value)
 
@@ -209,6 +223,7 @@ class ScalarParameter(Parameter):
 
 
 class SizeParameter(Parameter):
+
     def __init__(self, name):
         self.name = name
 
@@ -224,6 +239,7 @@ class SizeParameter(Parameter):
 
 
 class NonLinearityParameter(Parameter):
+
     def __init__(self, name):
         self.name = name
         self.options = {"tanh": [T.tanh, np.tanh],
@@ -249,4 +265,3 @@ class NonLinearityParameter(Parameter):
 
     def get_name(self):
         return self.value
-

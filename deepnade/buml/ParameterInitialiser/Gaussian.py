@@ -1,8 +1,10 @@
-from ParameterInitialiser import ParameterInitialiser
+from .ParameterInitialiser import ParameterInitialiser
 import numpy as np
 
+
 class Gaussian(ParameterInitialiser):
-    def __init__(self, std = 0.05 , mean = 0.0):
+
+    def __init__(self, std=0.05, mean=0.0):
         self.std = std
         self.mean = mean
 

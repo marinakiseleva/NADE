@@ -1,8 +1,9 @@
 import numpy as np
-from TrainingController import TrainingController
+from .TrainingController import TrainingController
 
 
 class NaNBreaker(TrainingController):
+
     def __init__(self):
         pass
 

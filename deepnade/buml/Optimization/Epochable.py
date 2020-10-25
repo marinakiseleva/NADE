@@ -3,6 +3,7 @@ from Optimization import has_parameter
 
 @has_parameter("updates_per_epoch", 1000)
 class Epochable(object):
+
     def __init__(self):
         self.epoch = 0
 

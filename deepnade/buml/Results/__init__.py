@@ -1,1 +1,1 @@
-from Results import *
+from .Results import *

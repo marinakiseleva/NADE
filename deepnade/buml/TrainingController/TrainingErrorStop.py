@@ -1,10 +1,11 @@
-from TrainingController import TrainingController
+from .TrainingController import TrainingController
 
 
 class TrainingErrorStop(TrainingController):
     """
     Stops the training when the training error is lower than 'stop value'
     """
+
     def __init__(self, stop_value):
         self.stop_value = stop_value
 

@@ -2,8 +2,15 @@
 __pycache__/
 *.py[cod]
 
+
 # C extensions
 *.so
+
+# Additional ignores added by MK
+.DS_Store
+deepnade/output/
+output/
+
 
 # Distribution / packaging
 .Python

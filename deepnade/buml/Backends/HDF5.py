@@ -1,10 +1,12 @@
-from Backend import Backend
+from .Backend import Backend
 import h5py
 import os
 import string
 import re
 
+
 class HDF5(Backend):
+
     def __init__(self, path, filename, comment=""):
         self.path = path
         self.filename = "%s.hdf5" % (filename)
@@ -13,12 +15,13 @@ class HDF5(Backend):
             i += 1
             self.filename = "%s_%d.hdf5" % (filename, i)
         self.f = h5py.File(os.path.join(self.path, self.filename), 'w')
-        
+
 #    def open_file(self):
 #        return h5py.File(os.path.join(self.path, self.filename), 'a')
 
     def write_helper(self, f, route, attribute, value):
-        #TODO: This is such a botched job! Everything is there for a reason, though. Be careful.
+        # TODO: This is such a botched job! Everything is there for a reason,
+        # though. Be careful.
         rs = "/" + string.join(map(str, route + [attribute]), '/')
         try:
             try:
@@ -42,7 +45,7 @@ class HDF5(Backend):
 
     def write(self, route, attribute, value):
         self.write_helper(self.f, route, attribute, value)
-        
+
     def read(self, route):
         """
         Reads an hdf5 dataset or a group (if it is a group it is returned as nested hashes)
@@ -51,7 +54,7 @@ class HDF5(Backend):
             try:
                 return d.value
             except Exception:
-                #Is a datagroup
+                # Is a datagroup
                 r = {}
                 for x in d.values():
                     name = re.search(".*/(.*)", str(x.name))

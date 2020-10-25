@@ -1,6 +1,6 @@
 import numpy as np
 from Optimization.Optimizer import Optimizer, has_parameter
-from Epochable import Epochable
+from .Epochable import Epochable
 from itertools import izip
 import theano
 import Data
@@ -9,6 +9,7 @@ import Data
 @has_parameter("minibatch_size", 100)
 @has_parameter("learning_rate", 0.1, theano_param=True)
 class SGD(Epochable, Optimizer):
+
     def __init__(self, model, loss):
         Epochable.__init__(self)
         Optimizer.__init__(self, model, loss)
@@ -57,14 +58,17 @@ class SGD(Epochable, Optimizer):
         if len(ret) == 3:
             step_loss, gradient, updates = ret
         else:
-            updates = theano.compat.python2x.OrderedDict()
+            updates = theano.compat.OrderedDict()
             step_loss, gradient = ret
         return step_loss, gradient, updates
 
     def compile_optimization_step(self, *params):
         # LL accumulator for each epoch
-        self.training_loss = theano.shared(np.array(0.0, dtype=theano.config.floatX), "training_loss")  # @UndefinedVariable
-        # Calculate loss for minibatch and gradient, optionally there's a 3rd returned variable which is used to initialize the theano function updates (needed if there is a scan in the symbolic loss function)
+        self.training_loss = theano.shared(
+            np.array(0.0, dtype=theano.config.floatX), "training_loss")  # @UndefinedVariable
+        # Calculate loss for minibatch and gradient, optionally there's a 3rd
+        # returned variable which is used to initialize the theano function
+        # updates (needed if there is a scan in the symbolic loss function)
         ret = self.loss(*params)
         step_loss, gradient, updates = self.ret_to_loss_gradient_updates(ret)
         updates[self.training_loss] = self.training_loss + step_loss

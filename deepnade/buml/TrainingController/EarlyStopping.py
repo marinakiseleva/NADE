@@ -1,8 +1,9 @@
 import numpy as np
-from TrainingController import TrainingController
+from .TrainingController import TrainingController
 
 
 class EarlyStopping(TrainingController):
+
     def __init__(self, measurement, n_iterations, maximization=False):
         self.measurement = measurement
         self.n_iterations = n_iterations

@@ -1,7 +1,8 @@
-from Backend import Backend
+from .Backend import Backend
 
 
 class Console(Backend):
+
     def __init__(self):
         self.last_route = ""
 

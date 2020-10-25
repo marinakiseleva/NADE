@@ -1,8 +1,9 @@
 import os
-from Backend import Backend
+from .Backend import Backend
 
 
 class TextFile(Backend):
+
     def __init__(self, filename):
         self.filename = filename
         i = 1

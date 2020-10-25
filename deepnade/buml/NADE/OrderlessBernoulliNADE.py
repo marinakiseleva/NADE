@@ -1,7 +1,7 @@
 # A NADE that has Bernoullis for output distribution
 from __future__ import division
 from Model.Model import SizeParameter, TensorParameter
-from NADE import NADE
+from .NADE import NADE
 from ParameterInitialiser import Gaussian
 from Utils.Estimation import Estimation
 from Utils.nnet import sigmoid, logsumexp
@@ -13,31 +13,41 @@ import theano.tensor as T
 
 
 class OrderlessBernoulliNADE(NADE):
+
     def __init__(self, n_visible, n_hidden, n_layers, nonlinearity="RLU"):
         NADE.__init__(self, n_visible, n_hidden, nonlinearity)
         self.add_parameter(SizeParameter("n_layers"))
         self.n_layers = n_layers
-        self.add_parameter(TensorParameter("Wflags", (n_visible, n_hidden), theano=True), optimise=True, regularise=True)
-        self.add_parameter(TensorParameter("W1", (n_visible, n_hidden), theano=True), optimise=True, regularise=True)
-        self.add_parameter(TensorParameter("b1", (n_hidden), theano=True), optimise=True, regularise=False)
+        self.add_parameter(TensorParameter("Wflags", (n_visible, n_hidden),
+                                           theano=True), optimise=True, regularise=True)
+        self.add_parameter(TensorParameter("W1", (n_visible, n_hidden),
+                                           theano=True), optimise=True, regularise=True)
+        self.add_parameter(TensorParameter("b1", (n_hidden), theano=True),
+                           optimise=True, regularise=False)
         if self.n_layers > 1:
-            self.add_parameter(TensorParameter("Ws", (n_layers, n_hidden, n_hidden), theano=True), optimise=True, regularise=True)
-            self.add_parameter(TensorParameter("bs", (n_layers, n_hidden), theano=True), optimise=True, regularise=False)
-        self.add_parameter(TensorParameter("V", (n_visible, n_hidden), theano=True), optimise=True, regularise=True)
-        self.add_parameter(TensorParameter("c", (n_visible), theano=True), optimise=True, regularise=False)
+            self.add_parameter(TensorParameter(
+                "Ws", (n_layers, n_hidden, n_hidden), theano=True), optimise=True, regularise=True)
+            self.add_parameter(TensorParameter("bs", (n_layers, n_hidden),
+                                               theano=True), optimise=True, regularise=False)
+        self.add_parameter(TensorParameter("V", (n_visible, n_hidden),
+                                           theano=True), optimise=True, regularise=True)
+        self.add_parameter(TensorParameter("c", (n_visible), theano=True),
+                           optimise=True, regularise=False)
         self.setup_n_orderings(1)
         self.recompile()
 
     @classmethod
     def create_from_params(cls, params):
-        n_visible, n_hidden, n_layers = (params["n_visible"], params["n_hidden"], params["n_layers"])
+        n_visible, n_hidden, n_layers = (params["n_visible"], params[
+                                         "n_hidden"], params["n_layers"])
         model = cls(n_visible, n_hidden, n_layers, params["nonlinearity"])
         model.set_parameters(params)
         return model
 
     @classmethod
     def create_from_smaller_NADE(cls, small_NADE, add_n_hiddens=1, W_initialiser=Gaussian(std=0.01), marginal=None):
-        n_visible, n_hidden, n_layers, nonlinearity = (small_NADE.n_visible, small_NADE.n_hidden, small_NADE.n_layers, small_NADE.parameters["nonlinearity"].get_name())
+        n_visible, n_hidden, n_layers, nonlinearity = (
+            small_NADE.n_visible, small_NADE.n_hidden, small_NADE.n_layers, small_NADE.parameters["nonlinearity"].get_name())
         model = cls(n_visible, n_hidden, n_layers + add_n_hiddens, nonlinearity)
         # Copy first layer
         model.Wflags.set_value(small_NADE.Wflags.get_value())
@@ -62,7 +72,8 @@ class OrderlessBernoulliNADE(NADE):
         x = T.matrix('x', dtype=floatX)
         m = T.matrix('m', dtype=floatX)
         logdensity = self.sym_mask_logdensity_estimator(x, m)
-        self.compiled_mask_logdensity_estimator = theano.function([x, m], logdensity, allow_input_downcast=True)
+        self.compiled_mask_logdensity_estimator = theano.function(
+            [x, m], logdensity, allow_input_downcast=True)
 
     def setup_n_orderings(self, n=None, orderings=None):
         assert(not (n is None and orderings is None))
@@ -129,7 +140,8 @@ class OrderlessBernoulliNADE(NADE):
                     h = nl(np.dot(h, Ws[l]) + bs[l])
                 t = np.dot(h, V[i]) + c[i]
                 p_xi_is_one = sigmoid(t) * 0.9999 + 0.0001 * 0.5
-                lp[:, o_index] += x_i * np.log(p_xi_is_one) + (1 - x_i) * np.log(1 - p_xi_is_one)
+                lp[:, o_index] += x_i * \
+                    np.log(p_xi_is_one) + (1 - x_i) * np.log(1 - p_xi_is_one)
                 a += np.dot(x[i][:, np.newaxis], W1[i][np.newaxis, :])
                 input_mask_contribution += Wflags[i]
         return logsumexp(lp + np.log(1 / self.n_orderings))
@@ -138,7 +150,8 @@ class OrderlessBernoulliNADE(NADE):
         loglikelihood = 0.0
         loglikelihood_sq = 0.0
         n = 0
-        x_iterator = x_dataset.iterator(batch_size=minibatch_size, get_smaller_final_batch=True)
+        x_iterator = x_dataset.iterator(
+            batch_size=minibatch_size, get_smaller_final_batch=True)
         m_iterator = masks_dataset.iterator(batch_size=minibatch_size)
         for _ in xrange(loops):
             for x, m in izip(x_iterator, m_iterator):
@@ -159,14 +172,19 @@ class OrderlessBernoulliNADE(NADE):
         mask = mask.T  # BxD
         output_mask = constantX(1) - mask  # BxD
         D = constantX(self.n_visible)
-        d = mask.sum(1)  # d is the 1-based index of the dimension whose value to infer (not the size of the context)
+        # d is the 1-based index of the dimension whose value to infer (not the
+        # size of the context)
+        d = mask.sum(1)
         masked_input = x * mask  # BxD
-        h = self.nonlinearity(T.dot(masked_input, self.W1) + T.dot(mask, self.Wflags) + self.b1)  # BxH
+        h = self.nonlinearity(T.dot(masked_input, self.W1) +
+                              T.dot(mask, self.Wflags) + self.b1)  # BxH
         for l in xrange(self.n_layers - 1):
             h = self.nonlinearity(T.dot(h, self.Ws[l]) + self.bs[l])  # BxH
         t = T.dot(h, self.V.T) + self.c  # BxD
-        p_x_is_one = T.nnet.sigmoid(t) * constantX(0.9999) + constantX(0.0001 * 0.5)  # BxD
-        lp = ((x * T.log(p_x_is_one) + (constantX(1) - x) * T.log(constantX(1) - p_x_is_one)) * output_mask).sum(1) * D / (D - d)  # B
+        p_x_is_one = T.nnet.sigmoid(t) * constantX(0.9999) + \
+            constantX(0.0001 * 0.5)  # BxD
+        lp = ((x * T.log(p_x_is_one) + (constantX(1) - x) *
+               T.log(constantX(1) - p_x_is_one)) * output_mask).sum(1) * D / (D - d)  # B
         return lp
 
     def sym_masked_neg_loglikelihood_gradient(self, x, mask):

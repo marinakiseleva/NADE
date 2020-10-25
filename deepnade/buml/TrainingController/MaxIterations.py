@@ -1,7 +1,8 @@
-from TrainingController import TrainingController
+from .TrainingController import TrainingController
 
 
 class MaxIterations(TrainingController):
+
     def __init__(self, max_iterations):
         self.max_iterations = max_iterations
 
