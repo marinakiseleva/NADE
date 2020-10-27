@@ -4,6 +4,10 @@ import copy
 class Instrumentation (object):
 
     def __init__(self, backends, measurement, at_lowest=[], at_highest=[], every=1, initial=True, final=True):
+        """
+        :param backends: usuallylist of context, attribute, value
+        :param measurement: usually Instrumentation.Configuration() or Instrumentation.TimeStamp()
+        """
         self.backends = backends if isinstance(backends, list) else [backends]
         self.measurement = measurement
         self.lowest = at_lowest if isinstance(at_lowest, list) else [at_lowest]

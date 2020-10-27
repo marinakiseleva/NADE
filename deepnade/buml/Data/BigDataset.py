@@ -49,13 +49,10 @@ class BigDataset(object):
         # traverse from the root
         entries = [self.f["/"]]
 
-        print("New entries " + str(entries))
-        print("Pats " + str(pats))
         for p in pats:
             entries = [v for r in entries for k,
                        v in r.items() if re.match("^%s$" % p, str(k))]
 
-        print("FINAL entries length: " + str(len(entries)))
         self.file_paths = [str(e.name) for e in entries]
         self.files = [[e[dsn] for e in entries] for dsn in self.element_names]
         # Support for block datapoints
