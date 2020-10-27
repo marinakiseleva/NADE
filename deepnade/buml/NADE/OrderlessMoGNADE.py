@@ -57,6 +57,9 @@ class OrderlessMoGNADE(NADE):
 
     @classmethod
     def create_from_smaller_NADE(cls, small_NADE, add_n_hiddens=1, W_initialiser=Gaussian(std=0.01), domains=None):
+        """
+        Creates NADE model. 
+        """
         n_visible, n_hidden, n_layers, n_components, nonlinearity = (
             small_NADE.n_visible, small_NADE.n_hidden, small_NADE.n_layers, small_NADE.n_components, small_NADE.parameters["nonlinearity"].get_name())
         model = cls(n_visible, n_hidden, n_layers +

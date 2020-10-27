@@ -12,6 +12,9 @@ import gc
 from Utils.DropoutMask import create_dropout_masks
 from Utils.theano_helpers import floatX
 
+
+import NADE
+
 # python original_NADE.py --dataset original_NADE/binarized_mnist.hdf5 --epoch_size 1000 --momentum 0.9 --lr 0.001 --deep --hlayers 2 --units 1000 --orderless --no_validation NADE_orderless/2h_1000
 # np.seterr(invalid = "raise", divide="raise")
 
@@ -19,41 +22,6 @@ from Utils.theano_helpers import floatX
 def log_message(backends, message):
     for b in backends:
         b.write([], "", message)
-
-
-def prep_datasets(options, hdf5_backend):
-        # Read datasets
-    dataset_file = os.path.join(os.environ["DATASETSPATH"], options.dataset)
-    training_dataset = Data.BigDataset(
-        dataset_file, options.training_route, options.samples_name)
-    if not options.no_validation:
-        validation_dataset = Data.BigDataset(
-            dataset_file, options.validation_route, options.samples_name)
-    test_dataset = Data.BigDataset(
-        dataset_file, options.test_route, options.samples_name)
-    n_visible = training_dataset.get_dimensionality(0)
-
-    # # Calculate normalsation constants
-    if options.normalize:
-        # Normalise all datasets
-        mean, std = Data.utils.get_dataset_statistics(training_dataset)
-        training_dataset = Data.utils.normalise_dataset(training_dataset, mean, std)
-        if not options.no_validation:
-            validation_dataset = Data.utils.normalise_dataset(
-                validation_dataset, mean, std)
-        test_dataset = Data.utils.normalise_dataset(test_dataset, mean, std)
-        hdf5_backend.write([], "normalisation/mean", mean)
-        hdf5_backend.write([], "normalisation/std", std)
-    # Dataset of masks
-    try:
-        masks_filename = options.dataset + "." + floatX + ".masks"
-        masks_route = os.path.join(os.environ["DATASETSPATH"], masks_filename)
-        masks_dataset = Data.BigDataset(masks_route + ".hdf5", "masks/.*", "masks")
-    except:
-        create_dropout_masks(os.environ["DATASETSPATH"],
-                             masks_filename, n_visible, ks=1000)
-        masks_dataset = Data.BigDataset(masks_route + ".hdf5", "masks/.*", "masks")
-    return training_dataset, validation_dataset, test_dataset, masks_dataset
 
 
 def get_parser():
@@ -104,40 +72,51 @@ def get_parser():
 
     gc.set_threshold(gc.get_threshold()[0] / 5)
     # gc.set_debug(gc.DEBUG_UNCOLLECTABLE | gc.DEBUG_INSTANCES | gc.DEBUG_OBJECTS)
-
-    # (options, args) = parser.parse_args()
     return parser
 
 
-def main():
-    parser = get_parser()
-    (options, args) = parser.parse_args()
-    if options.theano:
-        import NADE
-    else:
-        import npNADE as NADE
-        raise Exception("Not implemented yet")
-
-    results_route = os.path.join(os.environ["RESULTSPATH"], args[0])
-    try:
-        os.makedirs(results_route)
-    except OSError:
-        pass
-
-    console = Backends.Console()
-    textfile_log = Backends.TextFile(os.path.join(results_route, "NADE_training.log"))
-    hdf5_backend = Backends.HDF5(results_route, "NADE")
-    hdf5_backend.write([], "options", options)
-    hdf5_backend.write([], "svn_revision", Utils.svn.svnversion())
-    hdf5_backend.write([], "svn_status", Utils.svn.svnstatus())
-    hdf5_backend.write([], "svn_diff", Utils.svn.svndiff())
-
-    training_dataset, validation_dataset, test_dataset, masks_dataset = prep_datasets(
-        options, hdf5_backend)
-
+def prep_datasets(options, hdf5_backend):
+    """
+    Using passed-in options, return training, validation, testing, and 'masked' datasets
+    """
+    # Read datasets
+    dataset_file = os.path.join(os.environ["DATASETSPATH"], options.dataset)
+    training_dataset = Data.BigDataset(
+        dataset_file, options.training_route, options.samples_name)
+    if not options.no_validation:
+        validation_dataset = Data.BigDataset(
+            dataset_file, options.validation_route, options.samples_name)
+    test_dataset = Data.BigDataset(
+        dataset_file, options.test_route, options.samples_name)
     n_visible = training_dataset.get_dimensionality(0)
 
-    l = 1 if options.layerwise else options.hlayers
+    # # Calculate normalsation constants
+    if options.normalize:
+        # Normalise all datasets
+        mean, std = Data.utils.get_dataset_statistics(training_dataset)
+        training_dataset = Data.utils.normalise_dataset(training_dataset, mean, std)
+        if not options.no_validation:
+            validation_dataset = Data.utils.normalise_dataset(
+                validation_dataset, mean, std)
+        test_dataset = Data.utils.normalise_dataset(test_dataset, mean, std)
+        hdf5_backend.write([], "normalisation/mean", mean)
+        hdf5_backend.write([], "normalisation/std", std)
+    # Dataset of masks
+    try:
+        masks_filename = options.dataset + "." + floatX + ".masks"
+        masks_route = os.path.join(os.environ["DATASETSPATH"], masks_filename)
+        masks_dataset = Data.BigDataset(masks_route + ".hdf5", "masks/.*", "masks")
+    except:
+        create_dropout_masks(os.environ["DATASETSPATH"],
+                             masks_filename, n_visible, ks=1000)
+        masks_dataset = Data.BigDataset(masks_route + ".hdf5", "masks/.*", "masks")
+    return training_dataset, validation_dataset, test_dataset, masks_dataset
+
+
+def set_loss(options, l, n_visible, validation_dataset, masks_dataset):
+    """
+    Set loss measurement depending on the 'form' passed in.
+    """
     if options.form == "MoG":
         nade_class = NADE.OrderlessMoGNADE
         nade = nade_class(n_visible, options.units, l,
@@ -161,39 +140,111 @@ def main():
     else:
         raise Exception("Unknown form")
 
+    return nade_class, nade, loss_function, validation_loss_measurement
+
+
+def pretrain_layerwise(m):
+    """
+    """
+    options = m.options
+    textfile_log = m.textfile_log
+    hdf5_backend = m.hdf5_backend
+    console = m.console
+    nade_class = m.nade_class
+    nade = m.nade
+    loss_function = m.loss_function
+    training_dataset = m.training_dataset
+    masks_dataset = m.masks_dataset
+
+    # Pretrain layerwise
+    for l in xrange(1, options.hlayers + 1):
+        if l == 1:
+            nade.initialize_parameters_from_dataset(training_dataset)
+        else:
+            nade = nade_class.create_from_smaller_NADE(nade, add_n_hiddens=1)
+        # Configure training
+        trainer = Optimization.MomentumSGD(
+            nade, nade.__getattribute__(loss_function))
+        trainer.set_datasets([training_dataset, masks_dataset])
+        trainer.set_learning_rate(options.lr)
+        trainer.set_datapoints_as_columns(True)
+        trainer.add_controller(TrainingController.AdaptiveLearningRate(
+            options.lr, 0, epochs=options.pretraining_epochs))
+        trainer.add_controller(
+            TrainingController.MaxIterations(options.pretraining_epochs))
+        trainer.add_controller(TrainingController.ConfigurationSchedule(
+            "momentum", [(2, 0), (float('inf'), options.momentum)]))
+        trainer.set_updates_per_epoch(options.epoch_size)
+        trainer.set_minibatch_size(options.batch_size)
+    #    trainer.set_weight_decay_rate(options.wd)
+        trainer.add_controller(TrainingController.NaNBreaker())
+        # Instrument the training
+        trainer.add_instrumentation(Instrumentation.Instrumentation([console, textfile_log, hdf5_backend],
+                                                                    Instrumentation.Function("training_loss", lambda ins: ins.get_training_loss())))
+        trainer.add_instrumentation(Instrumentation.Instrumentation(
+            [console, textfile_log, hdf5_backend], Instrumentation.Configuration()))
+        trainer.add_instrumentation(Instrumentation.Instrumentation(
+            [console, textfile_log, hdf5_backend], Instrumentation.Timestamp()))
+        # Train
+        trainer.set_context("pretraining_%d" % l)
+        trainer.train()
+    return nade, trainer
+
+
+class ModelMngr():
+
+    def __init__(self, options):
+        print("Init model manager")
+        self.options = options
+
+
+def main():
+    parser = get_parser()
+    (options, args) = parser.parse_args()
+    # if options.theano:
+    #     import NADE
+    # else:
+    #     import npNADE as NADE
+    #     raise Exception("Not implemented yet")
+
+    results_route = os.path.join(os.environ["RESULTSPATH"], args[0])
+    try:
+        os.makedirs(results_route)
+    except OSError:
+        pass
+
+    m = ModelMngr(options)
+
+    console = Backends.Console()
+    textfile_log = Backends.TextFile(os.path.join(results_route, "NADE_training.log"))
+    hdf5_backend = Backends.HDF5(results_route, "NADE")
+    hdf5_backend.write([], "options", options)
+    hdf5_backend.write([], "svn_revision", Utils.svn.svnversion())
+    hdf5_backend.write([], "svn_status", Utils.svn.svnstatus())
+    hdf5_backend.write([], "svn_diff", Utils.svn.svndiff())
+
+    training_dataset, validation_dataset, test_dataset, masks_dataset = prep_datasets(
+        options, hdf5_backend)
+
+    n_visible = training_dataset.get_dimensionality(0)
+
+    l = 1 if options.layerwise else options.hlayers
+
+    nade_class, nade, loss_function, validation_loss_measurement = set_loss(
+        options, l, n_visible, validation_dataset, masks_dataset)
+
+    m.textfile_log = textfile_log
+    m.hdf5_backend = hdf5_backend
+    m.console = console
+    m.nade_class = nade_class
+    m.nade = nade
+    m.loss_function = loss_function
+    m.training_dataset = training_dataset
+    m.masks_dataset = masks_dataset
+
     if options.layerwise:
-        # Pretrain layerwise
-        for l in xrange(1, options.hlayers + 1):
-            if l == 1:
-                nade.initialize_parameters_from_dataset(training_dataset)
-            else:
-                nade = nade_class.create_from_smaller_NADE(nade, add_n_hiddens=1)
-            # Configure training
-            trainer = Optimization.MomentumSGD(
-                nade, nade.__getattribute__(loss_function))
-            trainer.set_datasets([training_dataset, masks_dataset])
-            trainer.set_learning_rate(options.lr)
-            trainer.set_datapoints_as_columns(True)
-            trainer.add_controller(TrainingController.AdaptiveLearningRate(
-                options.lr, 0, epochs=options.pretraining_epochs))
-            trainer.add_controller(
-                TrainingController.MaxIterations(options.pretraining_epochs))
-            trainer.add_controller(TrainingController.ConfigurationSchedule(
-                "momentum", [(2, 0), (float('inf'), options.momentum)]))
-            trainer.set_updates_per_epoch(options.epoch_size)
-            trainer.set_minibatch_size(options.batch_size)
-        #    trainer.set_weight_decay_rate(options.wd)
-            trainer.add_controller(TrainingController.NaNBreaker())
-            # Instrument the training
-            trainer.add_instrumentation(Instrumentation.Instrumentation([console, textfile_log, hdf5_backend],
-                                                                        Instrumentation.Function("training_loss", lambda ins: ins.get_training_loss())))
-            trainer.add_instrumentation(Instrumentation.Instrumentation(
-                [console, textfile_log, hdf5_backend], Instrumentation.Configuration()))
-            trainer.add_instrumentation(Instrumentation.Instrumentation(
-                [console, textfile_log, hdf5_backend], Instrumentation.Timestamp()))
-            # Train
-            trainer.set_context("pretraining_%d" % l)
-            trainer.train()
+        nade, trainer = pretrain_layerwise(m)
+
     else:  # No pretraining
         nade.initialize_parameters_from_dataset(training_dataset)
     # Configure training
@@ -296,5 +347,7 @@ def main():
                     components)], "test_likelihood", est.estimation)
                 hdf5_backend.write(["results", "mixtures", str(
                     components)], "test_likelihood_se", est.se)
+
+
 if __name__ == "__main__":
     main()
