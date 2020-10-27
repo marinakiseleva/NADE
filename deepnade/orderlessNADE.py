@@ -198,6 +198,47 @@ class ModelMngr():
         self.options = options
 
 
+def pre_training_configs(m):
+    """
+    Before training the model, configure it 
+    """
+    ordering = range(m.n_visible)
+    np.random.shuffle(ordering)
+    trainer = Optimization.MomentumSGD(m.nade, m.nade.__getattribute__(m.loss_function))
+    trainer.set_datasets([m.training_dataset, m.masks_dataset])
+    trainer.set_learning_rate(m.options.lr)
+    trainer.set_datapoints_as_columns(True)
+    trainer.add_controller(TrainingController.AdaptiveLearningRate(
+        m.options.lr, 0, epochs=m.options.epochs))
+    trainer.add_controller(TrainingController.MaxIterations(m.options.epochs))
+    if m.options.training_ll_stop < np.inf:
+        # Assumes that we're doing minimization so negative ll
+        trainer.add_controller(
+            TrainingController.TrainingErrorStop(-m.options.training_ll_stop))
+    trainer.add_controller(TrainingController.ConfigurationSchedule(
+        "momentum", [(2, 0), (float('inf'), m.options.momentum)]))
+    trainer.set_updates_per_epoch(m.options.epoch_size)
+    trainer.set_minibatch_size(m.options.batch_size)
+#    trainer.set_weight_decay_rate(options.wd)
+    trainer.add_controller(TrainingController.NaNBreaker())
+    # Instrument the training
+    trainer.add_instrumentation(Instrumentation.Instrumentation(
+        [m.console, m.textfile_log, m.hdf5_backend], Instrumentation.Function("training_loss", lambda ins: ins.get_training_loss())))
+    if not m.options.no_validation:
+        trainer.add_instrumentation(Instrumentation.Instrumentation([m.console],
+                                                                    m.validation_loss_measurement))
+        trainer.add_instrumentation(Instrumentation.Instrumentation([m.hdf5_backend],
+                                                                    m.validation_loss_measurement,
+                                                                    at_lowest=[Instrumentation.Parameters()]))
+    trainer.add_instrumentation(Instrumentation.Instrumentation(
+        [m.console, m.textfile_log, m.hdf5_backend], Instrumentation.Configuration()))
+    # trainer.add_instrumentation(Instrumentation.Instrumentation([hdf5_backend], Instrumentation.Parameters(), every = 10))
+    trainer.add_instrumentation(Instrumentation.Instrumentation(
+        [m.console, m.textfile_log, m.hdf5_backend], Instrumentation.Timestamp()))
+
+    return trainer
+
+
 def main():
     parser = get_parser()
     (options, args) = parser.parse_args()
@@ -212,8 +253,6 @@ def main():
         os.makedirs(results_route)
     except OSError:
         pass
-
-    m = ModelMngr(options)
 
     console = Backends.Console()
     textfile_log = Backends.TextFile(os.path.join(results_route, "NADE_training.log"))
@@ -233,119 +272,96 @@ def main():
     nade_class, nade, loss_function, validation_loss_measurement = set_loss(
         options, l, n_visible, validation_dataset, masks_dataset)
 
+    # Keep track of all model params in this object, m
+    m = ModelMngr(options)
+    m.n_visible = n_visible
     m.textfile_log = textfile_log
     m.hdf5_backend = hdf5_backend
     m.console = console
     m.nade_class = nade_class
     m.nade = nade
+    m.validation_loss_measurement = validation_loss_measurement
     m.loss_function = loss_function
     m.training_dataset = training_dataset
     m.masks_dataset = masks_dataset
 
-    if options.layerwise:
+    if m.options.layerwise:
         nade, trainer = pretrain_layerwise(m)
+        m.nade = nade
+        m.trainer = trainer
 
     else:  # No pretraining
-        nade.initialize_parameters_from_dataset(training_dataset)
+        nade.initialize_parameters_from_dataset(m.training_dataset)
+
     # Configure training
-    ordering = range(n_visible)
-    np.random.shuffle(ordering)
-    trainer = Optimization.MomentumSGD(nade, nade.__getattribute__(loss_function))
-    trainer.set_datasets([training_dataset, masks_dataset])
-    trainer.set_learning_rate(options.lr)
-    trainer.set_datapoints_as_columns(True)
-    trainer.add_controller(TrainingController.AdaptiveLearningRate(
-        options.lr, 0, epochs=options.epochs))
-    trainer.add_controller(TrainingController.MaxIterations(options.epochs))
-    if options.training_ll_stop < np.inf:
-        # Assumes that we're doing minimization so negative ll
-        trainer.add_controller(
-            TrainingController.TrainingErrorStop(-options.training_ll_stop))
-    trainer.add_controller(TrainingController.ConfigurationSchedule(
-        "momentum", [(2, 0), (float('inf'), options.momentum)]))
-    trainer.set_updates_per_epoch(options.epoch_size)
-    trainer.set_minibatch_size(options.batch_size)
-#    trainer.set_weight_decay_rate(options.wd)
-    trainer.add_controller(TrainingController.NaNBreaker())
-    # Instrument the training
-    trainer.add_instrumentation(Instrumentation.Instrumentation([console, textfile_log, hdf5_backend],
-                                                                Instrumentation.Function("training_loss", lambda ins: ins.get_training_loss())))
-    if not options.no_validation:
-        trainer.add_instrumentation(Instrumentation.Instrumentation([console],
-                                                                    validation_loss_measurement))
-        trainer.add_instrumentation(Instrumentation.Instrumentation([hdf5_backend],
-                                                                    validation_loss_measurement,
-                                                                    at_lowest=[Instrumentation.Parameters()]))
-    trainer.add_instrumentation(Instrumentation.Instrumentation(
-        [console, textfile_log, hdf5_backend], Instrumentation.Configuration()))
-    # trainer.add_instrumentation(Instrumentation.Instrumentation([hdf5_backend], Instrumentation.Parameters(), every = 10))
-    trainer.add_instrumentation(Instrumentation.Instrumentation(
-        [console, textfile_log, hdf5_backend], Instrumentation.Timestamp()))
+    trainer = pre_training_configs(m)
+
     # Train
     trainer.train()
     #------------------------------------------------------------------------------
     # Report some final performance measurements
     if trainer.was_successful():
         np.random.seed(8341)
-        hdf5_backend.write(["final_model"], "parameters", nade.get_parameters())
-        if not options.no_validation:
-            nade.set_parameters(hdf5_backend.read("/lowest_validation_loss/parameters"))
-        config = {"wd": options.wd, "h": options.units,
-                  "lr": options.lr, "q": options.n_quantiles}
+        m.hdf5_backend.write(["final_model"], "parameters", nade.get_parameters())
+        if not m.options.no_validation:
+            nade.set_parameters(m.hdf5_backend.read(
+                "/lowest_validation_loss/parameters"))
+        config = {"wd": m.options.wd, "h": m.options.units,
+                  "lr": m.options.lr, "q": m.options.n_quantiles}
         log_message([console, textfile_log], "Config %s" % str(config))
-        if options.show_training_stop:
+        if m.options.show_training_stop:
             training_likelihood = nade.estimate_loglikelihood_for_dataset(
                 training_dataset)
             log_message([console, textfile_log], "Training average loss\t%f" %
                         training_likelihood)
-            hdf5_backend.write([], "training_loss", training_likelihood)
+            m.hdf5_backend.write([], "training_loss", training_likelihood)
         val_ests = []
         test_ests = []
-        for i in xrange(options.summary_orderings):
+        for i in xrange(m.options.summary_orderings):
             nade.setup_n_orderings(n=1)
-            if not options.no_validation:
+            if not m.options.no_validation:
                 val_ests.append(
                     nade.estimate_loglikelihood_for_dataset(validation_dataset))
             test_ests.append(nade.estimate_loglikelihood_for_dataset(test_dataset))
-        if not options.no_validation:
+        if not m.options.no_validation:
             val_avgs = map(lambda x: x.estimation, val_ests)
             val_mean, val_se = (np.mean(val_avgs), scipy.stats.sem(val_avgs))
             log_message([console, textfile_log],
                         "*Validation mean\t%f \t(se: %f)" % (val_mean, val_se))
-            hdf5_backend.write([], "validation_likelihood", val_mean)
-            hdf5_backend.write([], "validation_likelihood_se", val_se)
+            m.hdf5_backend.write([], "validation_likelihood", val_mean)
+            m.hdf5_backend.write([], "validation_likelihood_se", val_se)
             for i, est in enumerate(val_ests):
                 log_message([console, textfile_log], "Validation detail #%d mean\t%f \t(se: %f)" % (
                     i + 1, est.estimation, est.se))
-                hdf5_backend.write(["results", "orderings", str(i + 1)],
-                                   "validation_likelihood", est.estimation)
-                hdf5_backend.write(["results", "orderings", str(i + 1)],
-                                   "validation_likelihood_se", est.se)
+                m.hdf5_backend.write(["results", "orderings", str(i + 1)],
+                                     "validation_likelihood", est.estimation)
+                m.hdf5_backend.write(["results", "orderings", str(i + 1)],
+                                     "validation_likelihood_se", est.se)
         test_avgs = map(lambda x: x.estimation, test_ests)
         test_mean, test_se = (np.mean(test_avgs), scipy.stats.sem(test_avgs))
         log_message([console, textfile_log], "*Test mean\t%f \t(se: %f)" %
                     (test_mean, test_se))
-        hdf5_backend.write([], "test_likelihood", test_mean)
-        hdf5_backend.write([], "test_likelihood_se", test_se)
+        m.hdf5_backend.write([], "test_likelihood", test_mean)
+        m.hdf5_backend.write([], "test_likelihood_se", test_se)
         for i, est in enumerate(test_ests):
             log_message([console, textfile_log], "Test detail #%d mean\t%f \t(se: %f)" % (
                 i + 1, est.estimation, est.se))
-            hdf5_backend.write(["results", "orderings", str(i + 1)],
-                               "test_likelihood", est.estimation)
-            hdf5_backend.write(["results", "orderings", str(i + 1)],
-                               "test_likelihood_se", est.se)
-        hdf5_backend.write([], "final_score", test_mean)
+            m.hdf5_backend.write(["results", "orderings", str(i + 1)],
+                                 "test_likelihood", est.estimation)
+            m.hdf5_backend.write(["results", "orderings", str(i + 1)],
+                                 "test_likelihood_se", est.se)
+        m.hdf5_backend.write([], "final_score", test_mean)
         # Report results on ensembles of NADES
-        if options.report_mixtures:
+        if m.options.report_mixtures:
             # #
             for components in [2, 4, 8, 16, 32]:
                 nade.setup_n_orderings(n=components)
                 est = nade.estimate_loglikelihood_for_dataset(test_dataset)
                 log_message([console, textfile_log], "Test ll mixture of nades %d components: mean\t%f \t(se: %f)" % (
                     components, est.estimation, est.se))
-                hdf5_backend.write(["results", "mixtures", str(
+                m.hdf5_backend.write(["results", "mixtures", str(
                     components)], "test_likelihood", est.estimation)
-                hdf5_backend.write(["results", "mixtures", str(
+                m.hdf5_backend.write(["results", "mixtures", str(
                     components)], "test_likelihood_se", est.se)
 
 
