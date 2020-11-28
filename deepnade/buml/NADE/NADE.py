@@ -10,6 +10,7 @@ import Utils
 
 class NADE(Model):
     """A NADE abstract class"""
+
     def __init__(self, n_visible, n_hidden, nonlinearity="RLU"):
         self.theano_rng = RandomStreams(np.random.randint(2 ** 30))
         self.add_parameter(SizeParameter("n_visible"))
@@ -38,7 +39,8 @@ class NADE(Model):
         loglikelihood = 0.0
         loglikelihood_sq = 0.0
         n = 0
-        iterator = x_dataset.iterator(batch_size=minibatch_size, get_smaller_final_batch=True)
+        iterator = x_dataset.iterator(
+            batch_size=minibatch_size, get_smaller_final_batch=True)
         for x in iterator:
             x = x.T  # VxB
             n += x.shape[1]
@@ -51,7 +53,8 @@ class NADE(Model):
         x = T.matrix('x', dtype=theano.config.floatX)
         logdensity, updates = self.sym_logdensity(x)
         # self.compiled_logdensity = theano.function([x], logdensity, allow_input_downcast = True, updates = updates, mode=theano.compile.MonitorMode(post_func=Utils.theano_helpers.detect_nan))
-        self.compiled_logdensity = theano.function([x], logdensity, allow_input_downcast=True, updates=updates)
+        self.compiled_logdensity = theano.function(
+            [x], logdensity, allow_input_downcast=True, updates=updates)
 #         gradients, updates = self.sym_gradients(x)
 #         self.compiled_gradients = theano.function([x], gradients, allow_input_downcast=True, updates=updates)
 
@@ -68,7 +71,8 @@ class NADE(Model):
             updates = dict()
         loss = -loglikelihood.mean()
         # Gradients
-        gradients = dict([(param, T.grad(loss, self.get_parameter(param))) for param in self.get_parameters_to_optimise()])
+        gradients = dict([(param, T.grad(loss, self.get_parameter(param)))
+                          for param in self.get_parameters_to_optimise()])
         return (loss, gradients, updates)
 
     @classmethod
@@ -80,6 +84,7 @@ class NADE(Model):
 
 class MixtureNADE(NADE):
     """ An abstract NADE model, that outputs a mixture model for each element """
+
     def __init__(self, n_visible, n_hidden, n_components, nonlinearity="RLU"):
         NADE.__init__(self, n_visible, n_hidden, nonlinearity)
         self.add_parameter(SizeParameter("n_components"))
@@ -87,6 +92,7 @@ class MixtureNADE(NADE):
 
     @classmethod
     def create_from_params(cls, params):
-        model = cls(params["n_visible"], params["n_hidden"], params["n_components"], params["nonlinearity"])
+        model = cls(params["n_visible"], params["n_hidden"],
+                    params["n_components"], params["nonlinearity"])
         model.set_parameters(params)
         return model

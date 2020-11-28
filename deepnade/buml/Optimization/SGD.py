@@ -69,6 +69,7 @@ class SGD(Epochable, Optimizer):
         # Calculate loss for minibatch and gradient, optionally there's a 3rd
         # returned variable which is used to initialize the theano function
         # updates (needed if there is a scan in the symbolic loss function)
+
         ret = self.loss(*params)
         step_loss, gradient, updates = self.ret_to_loss_gradient_updates(ret)
         updates[self.training_loss] = self.training_loss + step_loss

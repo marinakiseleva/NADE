@@ -167,14 +167,18 @@ class MoGNADE(MixtureNADE):
                     lp_accum + lp_current,
                     dP_da_i,
                     gW, gb_alpha, gV_alpha, gb_mu, gV_mu, gb_sigma, gV_sigma, gfact)
-
         p_accum = T.zeros_like(X[0])
         dP_da_ip1 = T.zeros_like(top_activations)
-        ([_, ps, _, gW, gb_alpha, gV_alpha, gb_mu, gV_mu, gb_sigma, gV_sigma, gfact], updates2) = theano.scan(density_and_gradients,
-                                                                                                              go_backwards=True,
-                                                                                                              sequences=[
-                                                                                                                  X, Xs_m1, self.W, self.V_alpha, self.b_alpha, self.V_mu, self.b_mu, self.V_sigma, self.b_sigma, self.activation_rescaling],
-                                                                                                              outputs_info=[top_activations, p_accum, dP_da_ip1, None, None, None, None, None, None, None, None])
+
+        sequences_used = [X, Xs_m1, self.W, self.V_alpha, self.b_alpha, self.V_mu,
+                          self.b_mu, self.V_sigma, self.b_sigma, self.activation_rescaling]
+        outputs_info = [top_activations, p_accum, dP_da_ip1,
+                        None, None, None, None, None, None, None, None]
+        ([_, ps, _, gW, gb_alpha, gV_alpha, gb_mu, gV_mu, gb_sigma, gV_sigma, gfact], updates2) = theano.scan(
+            density_and_gradients,
+            go_backwards=True,
+            sequences=sequences_used,
+            outputs_info=outputs_info)
         # scan with go_backwards returns the matrices in the order they were
         # created, so we have to reverse the order of the rows
         gW = gW[::-1, :]
@@ -187,7 +191,9 @@ class MoGNADE(MixtureNADE):
         gfact = gfact[::-1]
 
         updates.update(updates2)  # Returns None
-        return (ps[-1], {"W": gW, "b_alpha": gb_alpha, "V_alpha": gV_alpha, "b_mu": gb_mu, "V_mu": gV_mu, "b_sigma": gb_sigma, "V_sigma": gV_sigma, "activation_rescaling": gfact}, updates)
+        gradient_dict = {"W": gW, "b_alpha": gb_alpha, "V_alpha": gV_alpha, "b_mu": gb_mu,
+                         "V_mu": gV_mu, "b_sigma": gb_sigma, "V_sigma": gV_sigma, "activation_rescaling": gfact}
+        return (ps[-1], gradient_dict, updates)
 # return (ps[-1], gW, gb_alpha, gV_alpha, gb_mu, gV_mu, gb_sigma,
 # gV_sigma, gfact, updates)
 

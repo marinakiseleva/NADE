@@ -11,23 +11,25 @@ import copy
 from threading import Thread
 from Queue import Queue, Empty
 
+
 class Dataset(object):
+
     def __init__(self, data, block_length=1, use_blocks=None, offsets=None):
         """
         data can be a numpy array (in C order), a tuple of such arrays, or a list of such tuples or arrays
         """
         self.files = list()
-        if isinstance(data, list): #Several files
+        if isinstance(data, list):  # Several files
             for file in data:
                 if isinstance(file, tuple):
                     for d in file:
                         assert(isinstance(d, np.ndarray) and not np.isfortran(d))
                     self.files.append(file)
-        elif isinstance(data, tuple): #Just one file
+        elif isinstance(data, tuple):  # Just one file
             for d in data:
                 assert(isinstance(d, np.ndarray) and d.ndim == 2 and not np.isfortran(d))
             self.files.append(data)
-        elif isinstance(data, np.ndarray): #One file with one kind of element only (not input-output)
+        elif isinstance(data, np.ndarray):  # One file with one kind of element only (not input-output)
             assert(isinstance(data, np.ndarray) and not np.isfortran(data))
             self.files.append(tuple([data]))
         # Support for block datapoints
@@ -36,11 +38,15 @@ class Dataset(object):
             self.block_lengths = [np.int(1)] * self.get_arity()
             self.offsets = [np.int(0)] * self.get_arity()
         elif block_length > 1:
-            self.block_lengths = [np.int(block_length) if ub else np.int(1) for ub in use_blocks]  # np.asarray(dtype=np.int) and [np.int(x)] have elements with diff type. Careful!
+            # np.asarray(dtype=np.int) and [np.int(x)] have elements with diff type.
+            # Careful!
+            self.block_lengths = [np.int(block_length) if ub else np.int(1)
+                                  for ub in use_blocks]
             self.offsets = [np.int(off) for off in offsets]
             for ub, off in zip(use_blocks, offsets):
                 if off != 0 and ub:
-                    raise Exception("Can't have both a block size greater than 1 and an offset.")
+                    raise Exception(
+                        "Can't have both a block size greater than 1 and an offset.")
         else:
             raise Exception("Block size must be positive")
 
@@ -88,15 +94,19 @@ class Dataset(object):
         """
         if n is None:
             assert(proportion is not None)
-            total = sum([self.get_file_shape(0, i)[0] for i in xrange(len(self.file_paths))])
+            total = sum([self.get_file_shape(0, i)[0]
+                         for i in xrange(len(self.file_paths))])
             n = total * proportion
-        data = tuple(np.empty((n, self.get_dimensionality(i)), dtype=self.get_type(i)) for i in xrange(self.get_arity()))
+        data = tuple(np.empty((n, self.get_dimensionality(i)), dtype=self.get_type(i))
+                     for i in xrange(self.get_arity()))
         row = 0
         while row < n:
             file_index = np.random.randint(0, self.get_n_files())
-            index = np.random.randint(0, self.get_file_shape(0, file_index)[0] - (self.block_length - 1))
+            index = np.random.randint(0, self.get_file_shape(
+                0, file_index)[0] - (self.block_length - 1))
             for i in xrange(self.get_arity()):
-                data[i][row] = self.get_file(i, file_index)[index:index + self.block_lengths[i], :].flatten()
+                data[i][row] = self.get_file(i, file_index)[
+                    index:index + self.block_lengths[i], :].flatten()
             row += 1
         return data
 
@@ -116,6 +126,7 @@ class Dataset(object):
 
 
 class DatasetIterator(object):
+
     def __init__(self, dataset, batch_size, get_smaller_final_batch, shuffle, n_batches=None):
         self.dataset = dataset
         self.shuffle = shuffle
@@ -128,28 +139,34 @@ class DatasetIterator(object):
             self.return_type = lambda x: x[0]
         else:
             self.return_type = tuple
-        self.element_dimensionalities = [self.dataset.get_dimensionality(i) for i in xrange(self.arity)]
-        self.element_sizes = [np.int(self.dataset.get_file(i, 0).strides[0]) for i in xrange(self.arity)]
+        self.element_dimensionalities = [
+            self.dataset.get_dimensionality(i) for i in xrange(self.arity)]
+        self.element_sizes = [np.int(self.dataset.get_file(
+            i, 0).strides[0]) for i in xrange(self.arity)]
         self.element_types = [self.dataset.get_type(i) for i in xrange(self.arity)]
         self.element_block_lengths = self.dataset.block_lengths
         self.element_offsets = self.dataset.offsets
         self.block_length = self.dataset.block_length
         self.set_batch_size(batch_size, get_smaller_final_batch)
         # srcs
-        self.n_srcs = np.sum([np.int(self.dataset.get_n_blocks_in_file(i)) for i in xrange(self.dataset.get_n_files())])
-        self.srcs = [np.zeros(self.n_srcs, dtype="int") for i in xrange(self.dataset.get_arity())]
+        self.n_srcs = np.sum([np.int(self.dataset.get_n_blocks_in_file(i))
+                              for i in xrange(self.dataset.get_n_files())])
+        self.srcs = [np.zeros(self.n_srcs, dtype="int")
+                     for i in xrange(self.dataset.get_arity())]
         src_count = 0
         for f in xrange(self.dataset.get_n_files()):
             for i in xrange(self.dataset.get_n_blocks_in_file(f)):
                 for e in xrange(self.dataset.get_arity()):
-                    self.srcs[e][src_count] = self.dataset.files[f][e].ctypes.data + self.element_sizes[e] * (self.element_offsets[e] +  i)
+                    self.srcs[e][src_count] = self.dataset.files[f][
+                        e].ctypes.data + self.element_sizes[e] * (self.element_offsets[e] + i)
                 src_count += 1
         self.restart()
 
     def set_batch_size(self, n, get_smaller_final_batch):
         self.batch_size = np.int(n)
         self.get_smaller_final_batch = get_smaller_final_batch
-        self.batches = [np.empty((self.batch_size, self.element_dimensionalities[i]), dtype=self.element_types[i]) for i in xrange(self.arity)]
+        self.batches = [np.empty((self.batch_size, self.element_dimensionalities[
+                                 i]), dtype=self.element_types[i]) for i in xrange(self.arity)]
 
     def get_arity(self):
         return self.arity
@@ -193,7 +210,7 @@ class DatasetIterator(object):
             return self.return_type(self.batches)
         elif self.n_batches is None:
             srcs_left = self.n_srcs - self.srcs_index
-            if srcs_left ==0 or not self.get_smaller_final_batch:
+            if srcs_left == 0 or not self.get_smaller_final_batch:
                 raise StopIteration
             else:
                 for j in xrange(self.arity):
@@ -239,6 +256,7 @@ class DatasetIterator(object):
 
 class DatasetFileIterator(object):
     # TODO: it should be possible to obtain the files in a randomized order.
+
     def __init__(self, dataset, **kwargs):
         self.dataset = dataset
 
@@ -251,29 +269,33 @@ class DatasetFileIterator(object):
             raise StopIteration
         else:
             self.f_index += 1
-            x = [self.dataset.get_file(e, self.f_index - 1) for e in xrange(self.dataset.get_arity())]
+            x = [self.dataset.get_file(e, self.f_index - 1)
+                 for e in xrange(self.dataset.get_arity())]
             return tuple(x)
 
-def load_dataset_from_hdf5(filename, entries_regexp, element_names, block_length=1, use_blocks=None, offsets=None):
-        """
-        filename: hdf5 filename
-        entries_regexp: Regular expresion for selecting files in the hdf5 file (e.g. /training/.*/.*/.*)
-        element_names: Name of the hdf5 tensors with the actual data for each of the files. (e.g. tuple("acoustics", "phone_state") ).
-        delete_after_use: If set to True the hdf5 file will be deleted from the hard drive when the object is destroyed. It is used to create temporary hdf5 files as a results of "mapping" a dataset.
-        """
-        f = h5py.File(filename, "r")
-        element_names = element_names if isinstance(element_names, tuple) else (element_names,)
-        # # Find the entries that satisfy the regexp
-        # split the pattern by "/"
-        pats = entries_regexp.split("/")
-        try:
-            pats.remove("")
-        except:
-            pass
-        # traverse from the root
-        entries = [f["/"]]
-        for p in pats:
-            entries = [v for r in entries for k, v in r.items() if re.match("^%s$" % p, str(k))]
-        data = [tuple([np.array(e[dsn].value) for dsn in element_names]) for e in entries]
 
-        return Dataset(data, block_length, use_blocks, offsets)
+def load_dataset_from_hdf5(filename, entries_regexp, element_names, block_length=1, use_blocks=None, offsets=None):
+    """
+    filename: hdf5 filename
+    entries_regexp: Regular expresion for selecting files in the hdf5 file (e.g. /training/.*/.*/.*)
+    element_names: Name of the hdf5 tensors with the actual data for each of the files. (e.g. tuple("acoustics", "phone_state") ).
+    delete_after_use: If set to True the hdf5 file will be deleted from the hard drive when the object is destroyed. It is used to create temporary hdf5 files as a results of "mapping" a dataset.
+    """
+    f = h5py.File(filename, "r")
+    element_names = element_names if isinstance(
+        element_names, tuple) else (element_names,)
+    # # Find the entries that satisfy the regexp
+    # split the pattern by "/"
+    pats = entries_regexp.split("/")
+    try:
+        pats.remove("")
+    except:
+        pass
+    # traverse from the root
+    entries = [f["/"]]
+    for p in pats:
+        entries = [v for r in entries for k,
+                   v in r.items() if re.match("^%s$" % p, str(k))]
+    data = [tuple([np.array(e[dsn].value) for dsn in element_names]) for e in entries]
+
+    return Dataset(data, block_length, use_blocks, offsets)
