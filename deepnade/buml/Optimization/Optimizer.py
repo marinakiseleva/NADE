@@ -15,14 +15,16 @@ def has_parameter(param_name, default_value=None, theano_param=False, theano_typ
 
             def setter(self, value):
                 return self.__getattribute__(param_name).set_value(np.array(value,
-                                                                 dtype=theano_type))
+                                                                            dtype=theano_type))
 
             def new_init(self, *args, **kwargs):
                 setattr(self, param_name, theano.shared(np.array(default_value,
                                                                  dtype=theano_type),
                                                         param_name))
-                setattr(self, "get_" + param_name, types.MethodType(getter, self, self.__class__))
-                setattr(self, "set_" + param_name, types.MethodType(setter, self, self.__class__))
+                setattr(self, "get_" + param_name,
+                        types.MethodType(getter, self, self.__class__))
+                setattr(self, "set_" + param_name,
+                        types.MethodType(setter, self, self.__class__))
                 original_init(self, *args, **kwargs)
         else:
             def getter(self):
@@ -33,12 +35,15 @@ def has_parameter(param_name, default_value=None, theano_param=False, theano_typ
 
             def new_init(self, *args, **kwargs):
                 setattr(self, param_name, default_value)
-                setattr(self, "get_" + param_name, types.MethodType(getter, self, self.__class__))
-                setattr(self, "set_" + param_name, types.MethodType(setter, self, self.__class__))
+                setattr(self, "get_" + param_name,
+                        types.MethodType(getter, self, self.__class__))
+                setattr(self, "set_" + param_name,
+                        types.MethodType(setter, self, self.__class__))
                 original_init(self, *args, **kwargs)
         setattr(cls, "__init__", new_init)
         try:
-            setattr(cls, "parameters", dict(getattr(cls, "parameters").items() + [(param_name, getter)]))
+            setattr(cls, "parameters", dict(
+                getattr(cls, "parameters").items() + [(param_name, getter)]))
         except AttributeError:
             setattr(cls, "parameters", {param_name: getter})
         return cls
@@ -47,9 +52,10 @@ def has_parameter(param_name, default_value=None, theano_param=False, theano_typ
 
 @has_parameter("datasets", None)
 class Optimizer(Instrumentable):
+
     def __init__(self, model, loss):
         self.model = model
-        self.loss = loss
+        self.loss = loss  # loss function defined for self. nearly always sym_neg_loglikelihood_gradient in NADE
         self.controllers = []
         self.finished = False
         self.context_name = "training"
@@ -90,7 +96,8 @@ class Optimizer(Instrumentable):
 
     def after_training_iteration(self):
         self.run_instrumentation()
-        self.finished = reduce(lambda t, c: t or c.after_training_iteration(self), self.controllers, False)
+        self.finished = reduce(lambda t, c: t or c.after_training_iteration(
+            self), self.controllers, False)
 
     def get_parameters(self):
         ''' Returns a dictionary with all the training method parameters '''

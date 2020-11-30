@@ -62,6 +62,9 @@ class NADE(Model):
         pass
 
     def sym_neg_loglikelihood_gradient(self, X):
+        print("\n\n entering sym_neg_loglikelihood_gradient")
+        print(type(X))
+        print(X)
         ret = self.sym_logdensity(X)
         if isinstance(ret, tuple):
             assert(len(ret) == 2)

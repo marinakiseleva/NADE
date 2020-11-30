@@ -30,7 +30,7 @@ class BigDataset(object):
         element_names: Name of the hdf5 tensors with the actual data for each of the files. (e.g. tuple("acoustics", "phone_state") ).
         delete_after_use: If set to True the hdf5 file will be deleted from the hard drive when the object is destroyed. It is used to create temporary hdf5 files as a results of "mapping" a dataset.
         """
-        print("\n\n BIG DATASET Working on " + str(filename))
+        print("\n\n BigDataset Working on " + str(filename))
         print("Entries " + str(entries_regexp))
 
         self.filename = filename
@@ -97,10 +97,14 @@ class BigDataset(object):
         return self.element_names
 
     def get_file(self, element, index):
+        """
+        Note, self.files is a list with only one element. That element is the list of HDF5 Datasets, each a different 'fold', and each with the same number of elements. 
+        """
         return np.array(self.files[element][index].value)  # , order='C')
         # return np.array(self.files[element][index].value, dtype=np.float32, order='C')
 
     def get_file_shape(self, element, index):
+
         return self.files[element][index].shape
 
     def get_n_blocks_in_file(self, index):
@@ -198,6 +202,8 @@ class BigDataset(object):
             file_index = np.random.randint(0, self.get_n_files())
             index = np.random.randint(0, self.get_file_shape(
                 0, file_index)[0] - (self.block_length - 1))
+            # get_arity returns 1, and so there is only 1 element in self.files;
+            # so we are only accessing and setting data[0] and self.files[0]
             for i in xrange(self.get_arity()):
                 data[i][row] = self.get_file(i, file_index)[
                     index:index + self.block_lengths[i], :].flatten()
