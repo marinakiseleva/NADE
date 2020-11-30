@@ -10,6 +10,7 @@ import Data.utils
 import scipy.stats
 import gc
 from Utils.DropoutMask import create_dropout_masks
+import NADE
 
 # python original_NADE.py --dataset original_NADE/binarized_mnist.hdf5 --epoch_size 1000 --momentum 0.9 --lr 0.001 --deep --hlayers 2 --units 1000 --orderless --no_validation NADE_orderless/2h_1000
 # np.seterr(invalid = "raise", divide="raise")
@@ -20,7 +21,8 @@ def log_message(backends, message):
         b.write([], "", message)
 
 
-def main():
+def get_parser():
+
     parser = OptionParser(usage="usage: %prog [options] results_route")
     parser.add_option("--theano", dest="theano", default=False, action="store_true")
     # Model options
@@ -68,15 +70,12 @@ def main():
                       default=False, action="store_true")
 
     gc.set_threshold(gc.get_threshold()[0] / 5)
-    # gc.set_debug(gc.DEBUG_UNCOLLECTABLE | gc.DEBUG_INSTANCES | gc.DEBUG_OBJECTS)
+    return parser
 
-    (options, args) = parser.parse_args()
 
-    if options.theano:
-        import NADE
-    else:
-        import npNADE as NADE
-        raise Exception("Not implemented yet")
+def train_NADE(options, args):
+    if not options.theano:
+        raise Exception("I think you must run this with theano.")
 
     results_route = os.path.join(os.environ["RESULTSPATH"], args[0])
     try:
@@ -179,43 +178,44 @@ def main():
     trainer.train()
     #------------------------------------------------------------------------------
     # Report some final performance measurements
-    if trainer.was_successful():
-        np.random.seed(8341)
-        hdf5_backend.write(["final_model"], "parameters", nade.get_parameters())
-        if not options.no_validation:
-            nade.set_parameters(hdf5_backend.read("/lowest_validation_loss/parameters"))
-        config = {"wd": options.wd, "h": options.units,
-                  "lr": options.lr, "q": options.n_quantiles}
-        log_message([console, textfile_log], "Config %s" % str(config))
+    if not trainer.was_successful():
+        raise Error("Trainer was not successful.")
 
-        if options.show_training_stop:
-            training_likelihood = nade.estimate_loglikelihood_for_dataset(
-                training_dataset)
-            log_message([console, textfile_log], "Training average loss\t%f" %
-                        training_likelihood)
-            hdf5_backend.write([], "training_loss", training_likelihood)
+    # I think random seed is because we are sampling from GMM, and we want to
+    # keep this consistent.
+    np.random.seed(8341)
 
-        if not options.no_validation:
-            val_est = nade.estimate_loglikelihood_for_dataset(validation_dataset)
-            log_message([console, textfile_log], "*Validation mean\t%f \t(se: %f)" %
-                        (val_est.estimation, val_est.se))
-            hdf5_backend.write([], "validation_likelihood", val_est.estimation)
-            hdf5_backend.write([], "validation_likelihood_se", val_est.se)
+    hdf5_backend.write(["final_model"], "parameters", nade.get_parameters())
+    if not options.no_validation:
+        nade.set_parameters(hdf5_backend.read("/lowest_validation_loss/parameters"))
+    config = {"wd": options.wd, "h": options.units,
+              "lr": options.lr, "q": options.n_quantiles}
+    log_message([console, textfile_log], "Config %s" % str(config))
 
-        # Sample and see likelihood of one sample
-        print("\n\n Consider sample likelihood from test set. ")
-        sample = test_dataset.get_file(0, 0)[1]
-        # sample = test_dataset.sample_data(3)
-        print("Sample : " + str(sample))
-        col_sample = np.atleast_2d(sample).T
-        ld = nade.logdensity(col_sample)
-        print("Log density " + str(ld))
+    if options.show_training_stop:
+        training_likelihood = nade.estimate_loglikelihood_for_dataset(
+            training_dataset)
+        log_message([console, textfile_log], "Training average loss\t%f" %
+                    training_likelihood)
+        hdf5_backend.write([], "training_loss", training_likelihood)
 
-        test_est = nade.estimate_loglikelihood_for_dataset(test_dataset)
-        log_message([console, textfile_log], "*Test mean\t%f \t(se: %f)" %
-                    (test_est.estimation, test_est.se))
-        hdf5_backend.write([], "test_likelihood", test_est.estimation)
-        hdf5_backend.write([], "test_likelihood_se", test_est.se)
-        hdf5_backend.write([], "final_score", test_est.estimation)
+    if not options.no_validation:
+        val_est = nade.estimate_loglikelihood_for_dataset(validation_dataset)
+        log_message([console, textfile_log], "*Validation mean\t%f \t(se: %f)" %
+                    (val_est.estimation, val_est.se))
+        hdf5_backend.write([], "validation_likelihood", val_est.estimation)
+        hdf5_backend.write([], "validation_likelihood_se", val_est.se)
 
-main()
+    test_est = nade.estimate_loglikelihood_for_dataset(test_dataset)
+    log_message([console, textfile_log], "*Test mean\t%f \t(se: %f)" %
+                (test_est.estimation, test_est.se))
+    hdf5_backend.write([], "test_likelihood", test_est.estimation)
+    hdf5_backend.write([], "test_likelihood_se", test_est.se)
+    hdf5_backend.write([], "final_score", test_est.estimation)
+    return nade
+
+
+if __name__ == "__main__":
+    parser = get_parser()
+    (options, args) = parser.parse_args()
+    train_NADE(options, args)
