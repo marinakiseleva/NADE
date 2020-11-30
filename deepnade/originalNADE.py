@@ -201,6 +201,16 @@ def main():
                         (val_est.estimation, val_est.se))
             hdf5_backend.write([], "validation_likelihood", val_est.estimation)
             hdf5_backend.write([], "validation_likelihood_se", val_est.se)
+
+        # Sample and see likelihood of one sample
+        print("\n\n Consider sample likelihood from test set. ")
+        sample = test_dataset.get_file(0, 0)[1]
+        # sample = test_dataset.sample_data(3)
+        print("Sample : " + str(sample))
+        col_sample = np.atleast_2d(sample).T
+        ld = nade.logdensity(col_sample)
+        print("Log density " + str(ld))
+
         test_est = nade.estimate_loglikelihood_for_dataset(test_dataset)
         log_message([console, textfile_log], "*Test mean\t%f \t(se: %f)" %
                     (test_est.estimation, test_est.se))

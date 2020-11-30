@@ -168,6 +168,9 @@ class OrderlessMoGNADE(NADE):
         self.setup_n_orderings(orderings=[ordering])
 
     def logdensity(self, x):
+        """
+        Get log density (log likelihood) of this sample x. 
+        """
         """ x is a matrix of column datapoints (VxB) V = n_visible, B = batch size """
         B = x.shape[1]
         nl = self.parameters["nonlinearity"].get_numpy_f()

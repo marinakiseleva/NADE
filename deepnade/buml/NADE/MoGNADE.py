@@ -15,7 +15,6 @@ from Utils.theano_helpers import log_sum_exp, constantX, floatX
 class MoGNADE(MixtureNADE):
 
     def __init__(self, n_visible, n_hidden, n_components, nonlinearity="RLU"):
-        print("\n\n here using MOGNADE")
         MixtureNADE.__init__(self, n_visible, n_hidden, n_components, nonlinearity)
         self.add_parameter(TensorParameter("W", (n_visible, n_hidden)),
                            optimise=True, regularise=True)
@@ -76,9 +75,9 @@ class MoGNADE(MixtureNADE):
         self.b_sigma.set_value(b_sigma)
 
     def sym_logdensity(self, x):
-        print("\n\n entering sym_logdensity")
-        print(type(x))
-        print(x)
+        """
+        Get symbolic expression for log density (I think)
+        """
         """ x is a matrix of column datapoints (VxB) V = n_visible, B = batch size """
         def density_given_previous_a_and_x(x, w, V_alpha, b_alpha, V_mu, b_mu, V_sigma, b_sigma, activations_factor, p_prev, a_prev, x_prev):
             a = a_prev + T.dot(T.shape_padright(x_prev, 1), T.shape_padleft(w, 1))
@@ -105,10 +104,6 @@ class MoGNADE(MixtureNADE):
         Update symbolic expresssions for gradients, for X.
         Doesn't seem to be called anywhere...
         """
-        print("\n\n entering sym_gradients_new")
-        print(type(X))
-        print(X)
-
         non_linearity_name = self.parameters["nonlinearity"].get_name()
         assert(non_linearity_name == "sigmoid" or non_linearity_name == "RLU")
         # First element is different (it is predicted from the bias only)

@@ -21,6 +21,9 @@ class NADE(Model):
         self.parameters["nonlinearity"].set_value(nonlinearity)
 
     def logdensity(self, x):
+        """
+        Get log likelihood of sample using Theano function
+        """
         return self.compiled_logdensity(x)
 
     def logdensity_new(self, x):
@@ -62,9 +65,7 @@ class NADE(Model):
         pass
 
     def sym_neg_loglikelihood_gradient(self, X):
-        print("\n\n entering sym_neg_loglikelihood_gradient")
-        print(type(X))
-        print(X)
+
         ret = self.sym_logdensity(X)
         if isinstance(ret, tuple):
             assert(len(ret) == 2)
