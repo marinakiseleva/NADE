@@ -30,8 +30,6 @@ class BigDataset(object):
         element_names: Name of the hdf5 tensors with the actual data for each of the files. (e.g. tuple("acoustics", "phone_state") ).
         delete_after_use: If set to True the hdf5 file will be deleted from the hard drive when the object is destroyed. It is used to create temporary hdf5 files as a results of "mapping" a dataset.
         """
-        print("\n\n BigDataset Working on " + str(filename))
-        print("Entries " + str(entries_regexp))
 
         self.filename = filename
         self.delete_after_use = (delete_after_use == True)

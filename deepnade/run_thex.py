@@ -9,7 +9,8 @@ run using:
 
 #  Imports and paths updates
 import os
-data_path = "/Users/marina/Documents/PhD/research/astro_research/data/testing/"
+test_path = "/Users/marina/Documents/PhD/research/astro_research/data/testing/"
+data_path = test_path + "THEx_HDF5s/"
 os.environ["DATASETSPATH"] = data_path
 os.environ["RESULTSPATH"] = "./output"
 os.environ["PYTHONPATH"] = "./buml:$PYTHONPATH"
@@ -18,8 +19,11 @@ sys.path
 sys.path.append('buml')
 import copy
 from optparse import OptionParser
+import pandas as pd
+
 from originalNADE import *
 import Data.utils
+
 
 # Default settings for all NADEs used
 NADE_CONSTS = ["--theano",
@@ -39,7 +43,7 @@ NADE_CONSTS = ["--theano",
                "--units", "100",  # units in hidden layer (I think)
                "--pretraining_epochs", "5",
                "--validation_loops", "20",
-               "--epochs", "20",  # number of epochs
+               "--epochs", "50",  # number of epochs
                "--normalize",
                "--batch_size", "100",
                "--show_training_stop", "True"]
@@ -56,20 +60,68 @@ def get_class_nade(class_name):
     return nade
 
 
+def get_lls(col_sample, class_nades):
+    """
+    Get likelihood of each class for this row
+    Return as dict.
+    :param col_sample: Sample being evaluated as column vector
+    :param class_nades: Map from class name to trained NADE
+    """
+    lls = {}
+    for class_name in class_nades.keys():
+        cnade = class_nades[class_name]
+        log_density = cnade.logdensity(col_sample)
+        lls[class_name] = log_density
+    return lls
+
+
+def get_MAP(log_likelihoods):
+    """
+    Get MAP - class with max likelihood assigned
+    Gets max key of dict passed in
+    :param log_likelihoods: Map from class name to log likelihood
+    """
+    max_class = max(log_likelihoods, key=log_likelihoods.get)
+    return max_class
+
 if __name__ == "__main__":
     """
     Create NADE per class.
     """
-    nade = get_class_nade("Unspecified Ia")
+    # classes = ['Unspecified Ia', 'Unspecified Ia Pec', 'Ia-91T', 'Ia-91bg', 'Ib/c', 'Unspecified Ib', 'IIb', 'Unspecified Ic', 'Ic Pec', 'Unspecified II', 'II P', 'IIn', 'TDE', 'GRB']
+    classes = ['Unspecified Ia', 'Unspecified II']
+    class_nades = {}
+    for class_name in classes:
+        print("\nTraining NADE for class " + str(class_name))
+        class_nades[class_name] = get_class_nade(class_name)
 
-    # dataset_file = data_path + options.dataset
-    # test_dataset = Data.BigDataset(
-    #     dataset_file, options.test_route, options.samples_name)
+    X_test_file = "SUB_test_set.hdf5"  # HDF5
+    y_test_file = "SUBSET_testing_labels.csv"  # CSV
 
-    # # Sample and see likelihood of one sample
-    # print("\n\n Consider sample likelihood from test set. ")
-    # sample = test_dataset.get_file(0, 0)[1]
+    test_X_hdf5 = Data.BigDataset(
+        data_path + X_test_file,
+        "/folds/1/tests/.*",
+        "data")
 
-    # col_sample = np.atleast_2d(sample).T
-    # ld = nade.logdensity(col_sample)
-    # print("Log density " + str(ld))
+    test_y = pd.read_csv(test_path + y_test_file)
+    test_X = test_X_hdf5.get_file(0, 0)
+    num_rows = test_X.shape[0]
+
+    if num_rows != test_y.shape[0]:
+        raise ValueError("Bad.")
+
+    accurate = 0
+    for i in range(num_rows):
+        row = test_X[i]
+        col_sample = np.atleast_2d(row).T  # transpose of row
+        label = test_y.iloc[i][0]
+
+        lls = get_lls(col_sample, class_nades)
+
+        max_class = get_MAP(lls)
+        if max_class == label:
+            accurate += 1
+
+    print("\n\nAccuracy over all test set")
+    print(np.float32(accurate) / np.float32(num_rows))
+    print("\n\n")
