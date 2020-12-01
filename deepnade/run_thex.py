@@ -9,8 +9,7 @@ run using:
 
 #  Imports and paths updates
 import os
-test_path = "/Users/marina/Documents/PhD/research/astro_research/data/testing/"
-data_path = test_path + "THEx_HDF5s/"
+data_path = "/Users/marina/Documents/PhD/research/astro_research/data/testing/PROCESSED_DATA/"
 os.environ["DATASETSPATH"] = data_path
 os.environ["RESULTSPATH"] = "./output"
 os.environ["PYTHONPATH"] = "./buml:$PYTHONPATH"
@@ -43,7 +42,7 @@ NADE_CONSTS = ["--theano",
                "--units", "100",  # units in hidden layer (I think)
                "--pretraining_epochs", "5",
                "--validation_loops", "20",
-               "--epochs", "50",  # number of epochs
+               "--epochs", "20",  # number of epochs
                "--normalize",
                "--batch_size", "100",
                "--show_training_stop", "True"]
@@ -95,15 +94,15 @@ if __name__ == "__main__":
         print("\nTraining NADE for class " + str(class_name))
         class_nades[class_name] = get_class_nade(class_name)
 
-    X_test_file = "SUB_test_set.hdf5"  # HDF5
-    y_test_file = "SUBSET_testing_labels.csv"  # CSV
+    X_test_file = "test_X.hdf5"  # HDF5
+    y_test_file = "test_y.csv"  # CSV
 
     test_X_hdf5 = Data.BigDataset(
         data_path + X_test_file,
         "/folds/1/tests/.*",
         "data")
 
-    test_y = pd.read_csv(test_path + y_test_file)
+    test_y = pd.read_csv(data_path + y_test_file)
     test_X = test_X_hdf5.get_file(0, 0)
     num_rows = test_X.shape[0]
 
