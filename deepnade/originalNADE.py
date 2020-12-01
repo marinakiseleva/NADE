@@ -179,7 +179,7 @@ def train_NADE(options, args):
     #------------------------------------------------------------------------------
     # Report some final performance measurements
     if not trainer.was_successful():
-        raise Error("Trainer was not successful.")
+        raise ValueError("Trainer was not successful.")
 
     # I think random seed is because we are sampling from GMM, and we want to
     # keep this consistent.

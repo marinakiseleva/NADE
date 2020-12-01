@@ -9,7 +9,8 @@ run using:
 
 #  Imports and paths updates
 import os
-data_path = "/Users/marina/Documents/PhD/research/astro_research/data/testing/PROCESSED_DATA/"
+test_path = "/Users/marina/Documents/PhD/research/astro_research/data/testing/"
+data_path = test_path + "PROCESSED_DATA/"
 os.environ["DATASETSPATH"] = data_path
 os.environ["RESULTSPATH"] = "./output"
 os.environ["PYTHONPATH"] = "./buml:$PYTHONPATH"
@@ -19,7 +20,7 @@ sys.path.append('buml')
 import copy
 from optparse import OptionParser
 import pandas as pd
-
+from collections import OrderedDict
 from originalNADE import *
 import Data.utils
 
@@ -42,9 +43,9 @@ NADE_CONSTS = ["--theano",
                "--units", "100",  # units in hidden layer (I think)
                "--pretraining_epochs", "5",
                "--validation_loops", "20",
-               "--epochs", "500",  # number of epochs
+               "--epochs", "18",  # number of epochs
                "--normalize",
-               "--batch_size", "100",
+               "--batch_size", "32",
                "--show_training_stop", "True"]
 # Other params
 # Nonlinearity function defaults to ReLU
@@ -68,10 +69,10 @@ def get_lls(col_sample, class_nades):
     :param col_sample: Sample being evaluated as column vector
     :param class_nades: Map from class name to trained NADE
     """
-    lls = {}
+    lls = OrderedDict()
     for class_name in class_nades.keys():
         cnade = class_nades[class_name]
-        log_density = cnade.logdensity(col_sample)
+        log_density = cnade.logdensity(col_sample)[0]
         lls[class_name] = log_density
     return lls
 
@@ -111,6 +112,8 @@ if __name__ == "__main__":
     if num_rows != test_y.shape[0]:
         raise ValueError("Bad.")
 
+    # Compute accuracy, and save all assigned likelihoods for test data
+    saved_lls = []
     accurate = 0
     for i in range(num_rows):
         row = test_X[i]
@@ -118,7 +121,7 @@ if __name__ == "__main__":
         label = test_y.iloc[i][0]
 
         lls = get_lls(col_sample, class_nades)
-
+        saved_lls.append(lls.values())
         max_class = get_MAP(lls)
         if max_class == label:
             accurate += 1
@@ -126,3 +129,6 @@ if __name__ == "__main__":
     print("\n\nAccuracy over all test set")
     print(np.float32(accurate) / np.float32(num_rows))
     print("\n\n")
+
+    output = pd.DataFrame(saved_lls, columns=classes)
+    output.to_csv(test_path + "OUTPUT/" + "nade_lls.csv", index=False)
