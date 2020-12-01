@@ -42,10 +42,12 @@ NADE_CONSTS = ["--theano",
                "--units", "100",  # units in hidden layer (I think)
                "--pretraining_epochs", "5",
                "--validation_loops", "20",
-               "--epochs", "20",  # number of epochs
+               "--epochs", "500",  # number of epochs
                "--normalize",
                "--batch_size", "100",
                "--show_training_stop", "True"]
+# Other params
+# Nonlinearity function defaults to ReLU
 
 
 def get_class_nade(class_name):
