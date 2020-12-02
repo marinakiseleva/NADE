@@ -48,7 +48,7 @@ NADE_CONSTS = ["--theano",
                "--units", "100",  # units in hidden layer (I think)
                # "--pretraining_epochs", "5",
                # "--validation_loops", "20", # for orderless NADE
-               "--epochs", "100",  # maximum number of epochs
+               "--epochs", "20",  # maximum number of epochs
                # "--normalize", "False",
                "--batch_size", "16",
                "--show_training_stop", "True"]
@@ -84,37 +84,51 @@ def get_class_nade(class_name):
     return nade
 
 
-def get_lls(col_sample, class_nades):
+def get_nlls(col_sample, class_nades):
     """
     Get likelihood of each class for this row
     Return as dict.
     :param col_sample: Sample being evaluated as column vector
     :param class_nades: Map from class name to trained NADE
     """
-    lls = OrderedDict()
+    class_nll = OrderedDict()
     for class_name in class_nades.keys():
         cnade = class_nades[class_name]
         log_density = cnade.logdensity(col_sample)[0]
-        lls[class_name] = log_density
-    return lls
+        class_nll[class_name] = log_density
+    return class_nll
 
 
-def get_MAP(log_likelihoods):
-    """
+def get_pred_class(neg_log_likelihoods):
+    """ 
+
     Get MAP - class with max likelihood assigned
     Gets max key of dict passed in
-    :param log_likelihoods: Map from class name to log likelihood
+    :param neg_log_likelihoods: Map from class name to neg log likelihood
     """
-    max_class = max(log_likelihoods, key=log_likelihoods.get)
-    return max_class
+
+    return min(neg_log_likelihoods, key=neg_log_likelihoods.get)
 
 if __name__ == "__main__":
     """
     Create NADE per class.
     """
     # classes = ['Unspecified Ia', 'Unspecified Ia Pec', 'Ia-91T', 'Ia-91bg', 'Ib/c', 'Unspecified Ib', 'IIb', 'Unspecified Ic', 'Ic Pec', 'Unspecified II', 'II P', 'IIn', 'TDE', 'GRB']
-    classes = ['TDE', 'Unspecified Ia', 'Unspecified II']
-    class_nades = {}
+    # classes = ['TDE', 'Unspecified Ia', 'Unspecified II']
+
+    ########################################################
+    # SET CLASSES MANUALLY HERE.
+    ########################################################
+
+    # THEx Data
+    # classes = ['Unspecified Ia', 'Unspecified II']
+
+    # SYNTHETIC DATA TEST
+    classes = ['dog', 'cat', 'mouse']
+
+    ########################################################
+
+    class_nades = OrderedDict()
     for class_name in classes:
         print("\nTraining NADE for class " + str(class_name))
         class_nades[class_name] = get_class_nade(class_name)
@@ -130,36 +144,21 @@ if __name__ == "__main__":
     test_y = pd.read_csv(data_path + y_test_file)
     test_X = test_X_hdf5.get_file(0, 0)
     num_rows = test_X.shape[0]
-    # # Normalize test data as training data is normalized
-    # mean, std = Data.utils.get_dataset_statistics(training_dataset)
-    # training_dataset = Data.utils.normalise_dataset(training_dataset, mean, std)
-    # if not options.no_validation:
-    #     validation_dataset = Data.utils.normalise_dataset(
-    #         validation_dataset, mean, std)
-    # test_dataset = Data.utils.normalise_dataset(test_dataset, mean, std)
-    # hdf5_backend.write([], "normalisation/mean", mean)
-    # hdf5_backend.write([], "normalisation/std", std)
 
     if num_rows != test_y.shape[0]:
         raise ValueError("Bad.")
 
-    # Compute accuracy, and save all assigned likelihoods for test data
-    saved_lls = []
-    accurate = 0
+    # Save all assigned likelihoods for test data
+    saved_nlls = []
     for i in range(num_rows):
         row = test_X[i]
         col_sample = np.atleast_2d(row).T  # transpose of row
-        label = test_y.iloc[i][0]
+        nlls = []
+        for class_name in classes:
+            cnade = class_nades[class_name]
+            neg_ll = cnade.logdensity(col_sample)[0]
+            nlls.append(neg_ll)
+        saved_nlls.append(nlls)
 
-        lls = get_lls(col_sample, class_nades)
-        saved_lls.append(lls.values())
-        max_class = get_MAP(lls)
-        if max_class == label:
-            accurate += 1
-
-    print("\n\nAccuracy over all test set")
-    print(np.float32(accurate) / np.float32(num_rows))
-    print("\n\n")
-
-    output = pd.DataFrame(saved_lls, columns=classes)
-    output.to_csv(test_path + "OUTPUT/" + "nade_lls.csv", index=False)
+    output = pd.DataFrame(saved_nlls, columns=classes)
+    output.to_csv(test_path + "OUTPUT/" + "nade_negativells.csv", index=False)

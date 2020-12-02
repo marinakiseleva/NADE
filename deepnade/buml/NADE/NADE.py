@@ -22,7 +22,7 @@ class NADE(Model):
 
     def logdensity(self, x):
         """
-        Get log likelihood of sample using Theano function
+        Get log likelihood of sample using Theano function 
         """
         return self.compiled_logdensity(x)
 
@@ -39,6 +39,12 @@ class NADE(Model):
         return self.compiled_sample()
 
     def estimate_loglikelihood_for_dataset(self, x_dataset, minibatch_size=1000):
+        """
+        Estimate the average  LOG LIKELIHOOD for the dataset.
+        NOTE: Because this is NADE and not a real distribution,
+        these likelihoods CAN and often ARE NEGATIVE! 
+        Basically returns ld.sum() / n
+        """
         loglikelihood = 0.0
         loglikelihood_sq = 0.0
         n = 0
@@ -47,10 +53,16 @@ class NADE(Model):
         for x in iterator:
             x = x.T  # VxB
             n += x.shape[1]
+            # get negative log density for array
             ld = self.logdensity(x)
+            # add together all negative log densities in array
             loglikelihood += ld.sum()
             loglikelihood_sq += (ld ** 2).sum()
-        return Estimation.sample_mean_from_sum_and_sum_sq(loglikelihood, loglikelihood_sq, n)
+
+        e = Estimation.sample_mean_from_sum_and_sum_sq(
+            loglikelihood, loglikelihood_sq, n)
+
+        return e
 
     def recompile(self):
         x = T.matrix('x', dtype=theano.config.floatX)
