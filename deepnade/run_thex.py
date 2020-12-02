@@ -40,17 +40,17 @@ NADE_CONSTS = ["--theano",
                "--samples_name", "data",
                "--hlayers", "2",  # 2 hidden layers
                "--layerwise",
-               "--lr", "0.002",  # learning rate
-               "--wd", "0.002",  # weight decay
+               "--lr", "0.0005",  # learning rate
+               "--wd", "0.002",  # weight decay not using...... pretty sure
                "--n_components", "10",  # number of GMM components
                "--epoch_size", "100",
                "--momentum", "0.9",
-               "--units", "100",  # units in hidden layer (I think)
+               "--units", "40",  # units in hidden layer (I think)
                # "--pretraining_epochs", "5",
                # "--validation_loops", "20", # for orderless NADE
-               "--epochs", "20",  # maximum number of epochs
+               "--epochs", "50",  # maximum number of epochs
                # "--normalize", "False",
-               "--batch_size", "16",
+               "--batch_size", "32",
                "--show_training_stop", "True"]
 # Other params
 # Nonlinearity function defaults to ReLU

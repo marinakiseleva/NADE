@@ -153,15 +153,11 @@ def train_NADE(options, args):
     # trainer.add_controller(TrainingController.AdaptiveLearningRate(options.lr, 0, epochs=options.epochs))
     trainer.add_controller(TrainingController.MaxIterations(options.epochs))
 
-    # if options.training_ll_stop < np.inf:
-    # Assumes that we're doing minimization so negative ll
-    # trainer.add_controller(
-    #     TrainingController.TrainingErrorStop(-options.training_ll_stop))
-
     # Add early stopping when training does better than validation
 
-    trainer.add_controller(
-        TrainingController.ValEarlyStopping(nade, validation_dataset))
+    # trainer.add_controller(
+    # TrainingController.ValEarlyStopping(nade, training_dataset,
+    # validation_dataset))
 
     trainer.add_controller(TrainingController.ConfigurationSchedule(
         "momentum", [(2, 0), (float('inf'), options.momentum)]))
