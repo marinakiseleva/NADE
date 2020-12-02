@@ -57,8 +57,8 @@ def get_parser():
     parser.add_option("--samples_name", dest="samples_name", default="data")
     parser.add_option("--normalize", dest="normalize",
                       default=False, action="store_true")
-    parser.add_option("--validation_loops", dest="validation_loops",
-                      default=16, type="int")
+    # parser.add_option("--validation_loops", dest="validation_loops",
+    #                   default=16, type="int")
     parser.add_option("--no_validation", dest="no_validation",
                       default=False, action="store_true")
     # Reports
@@ -103,6 +103,7 @@ def train_NADE(options, args):
     n_visible = training_dataset.get_dimensionality(0)
     # # Calculate normalsation constants
     if options.normalize:
+        raise ValueError("Do Not Normalize! It will make it complicated for testing.")
         # Normalise all datasets
         mean, std = Data.utils.get_dataset_statistics(training_dataset)
         training_dataset = Data.utils.normalise_dataset(training_dataset, mean, std)

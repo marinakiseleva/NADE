@@ -46,11 +46,11 @@ NADE_CONSTS = ["--theano",
                "--epoch_size", "100",
                "--momentum", "0.9",
                "--units", "100",  # units in hidden layer (I think)
-               "--pretraining_epochs", "5",
-               "--validation_loops", "40",
-               "--epochs", "100",  # number of epochs
-               "--normalize", "True",
-               "--batch_size", "32",
+               # "--pretraining_epochs", "5",
+               # "--validation_loops", "20", # for orderless NADE
+               "--epochs", "100",  # maximum number of epochs
+               # "--normalize", "False",
+               "--batch_size", "16",
                "--show_training_stop", "True"]
 # Other params
 # Nonlinearity function defaults to ReLU
@@ -63,7 +63,7 @@ def get_class_nade(class_name):
     del class_args[4]
     class_args.insert(4, class_name.replace(" ", "_") + "X.hdf5")
     options, args = parser.parse_args(class_args)
-    nade = train_NADE(options, args)
+    nade = train_NADE(options, ["THEx"])
 
     if options.show_training_stop:
         print("\n\n Training Stop Print Out for    " + class_name)
@@ -130,6 +130,15 @@ if __name__ == "__main__":
     test_y = pd.read_csv(data_path + y_test_file)
     test_X = test_X_hdf5.get_file(0, 0)
     num_rows = test_X.shape[0]
+    # # Normalize test data as training data is normalized
+    # mean, std = Data.utils.get_dataset_statistics(training_dataset)
+    # training_dataset = Data.utils.normalise_dataset(training_dataset, mean, std)
+    # if not options.no_validation:
+    #     validation_dataset = Data.utils.normalise_dataset(
+    #         validation_dataset, mean, std)
+    # test_dataset = Data.utils.normalise_dataset(test_dataset, mean, std)
+    # hdf5_backend.write([], "normalisation/mean", mean)
+    # hdf5_backend.write([], "normalisation/std", std)
 
     if num_rows != test_y.shape[0]:
         raise ValueError("Bad.")

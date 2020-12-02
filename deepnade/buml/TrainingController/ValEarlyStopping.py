@@ -17,13 +17,17 @@ class ValEarlyStopping(TrainingController):
 
     def after_training_iteration(self, trainable):
 
-        vloss = self.nade.estimate_loglikelihood_for_dataset(
+        print(trainable.epoch)
+        if trainable.epoch < 5:
+            print("don't count this")
+            return False
+        vloss = -self.nade.estimate_loglikelihood_for_dataset(
             self.validation_dataset, minibatch_size=20)
-        print("\n")
-        print("Validation loss " + str(vloss))
-        training_loss = -trainable.get_training_loss()
-        print("Training loss " + str(training_loss))
-        print("\n\n")
 
-        # if trainable.get_training_loss() < v:
-        #     print("\n\n training is better than validation \n\n")
+        training_loss = trainable.get_training_loss()
+
+        print("\nValidation loss " + str(vloss) +
+              "\nTraining loss " + str(training_loss) + "\n\n")
+
+        if training_loss < vloss:
+            return True
