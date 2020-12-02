@@ -204,7 +204,6 @@ def train_NADE(options, args):
     log_message([console, textfile_log], "Config %s" % str(config))
 
     if options.show_training_stop:
-        # estimate NEGAITVE LOG LIKELIHOOD
         training_likelihood = nade.estimate_loglikelihood_for_dataset(
             training_dataset)
         log_message([console, textfile_log], "Training average loss\t%f" %
@@ -212,14 +211,12 @@ def train_NADE(options, args):
         hdf5_backend.write([], "training_loss", training_likelihood)
 
     if not options.no_validation:
-        # estimate NEGAITVE LOG LIKELIHOOD
         val_est = nade.estimate_loglikelihood_for_dataset(validation_dataset)
         log_message([console, textfile_log], "*Validation mean\t%f \t(se: %f)" %
                     (val_est.estimation, val_est.se))
         hdf5_backend.write([], "validation_likelihood", val_est.estimation)
         hdf5_backend.write([], "validation_likelihood_se", val_est.se)
 
-    # estimate NEGAITVE LOG LIKELIHOOD
     test_est = nade.estimate_loglikelihood_for_dataset(test_dataset)
     log_message([console, textfile_log], "*Test mean\t%f \t(se: %f)" %
                 (test_est.estimation, test_est.se))

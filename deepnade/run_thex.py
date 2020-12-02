@@ -99,15 +99,15 @@ def get_nlls(col_sample, class_nades):
     return class_nll
 
 
-def get_pred_class(neg_log_likelihoods):
+def get_pred_class(lls):
     """ 
 
     Get MAP - class with max likelihood assigned
     Gets max key of dict passed in
-    :param neg_log_likelihoods: Map from class name to neg log likelihood
+    :param lls: Map from class name to log likelihood
     """
 
-    return min(neg_log_likelihoods, key=neg_log_likelihoods.get)
+    return max(lls, key=lls.get)
 
 if __name__ == "__main__":
     """
@@ -149,16 +149,16 @@ if __name__ == "__main__":
         raise ValueError("Bad.")
 
     # Save all assigned likelihoods for test data
-    saved_nlls = []
+    saved_loglikelihoods = []
     for i in range(num_rows):
         row = test_X[i]
         col_sample = np.atleast_2d(row).T  # transpose of row
-        nlls = []
+        lls = []
         for class_name in classes:
             cnade = class_nades[class_name]
-            neg_ll = cnade.logdensity(col_sample)[0]
-            nlls.append(neg_ll)
-        saved_nlls.append(nlls)
+            ll = cnade.logdensity(col_sample)[0]
+            lls.append(ll)
+        saved_loglikelihoods.append(lls)
 
-    output = pd.DataFrame(saved_nlls, columns=classes)
-    output.to_csv(test_path + "OUTPUT/" + "nade_negativells.csv", index=False)
+    output = pd.DataFrame(saved_loglikelihoods, columns=classes)
+    output.to_csv(test_path + "OUTPUT/" + "loglikelihoods.csv", index=False)
