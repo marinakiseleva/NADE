@@ -7,6 +7,12 @@ run using:
 
 """
 
+import sys
+
+if not (sys.version_info.major == 2 and sys.version_info.minor == 7):
+    raise ValueError("Must run this on Python 2.7")
+
+
 #  Imports and paths updates
 import os
 test_path = "/Users/marina/Documents/PhD/research/astro_research/data/testing/"
@@ -14,7 +20,6 @@ data_path = test_path + "PROCESSED_DATA/"
 os.environ["DATASETSPATH"] = data_path
 os.environ["RESULTSPATH"] = "./output"
 os.environ["PYTHONPATH"] = "./buml:$PYTHONPATH"
-import sys
 sys.path
 sys.path.append('buml')
 import copy
@@ -35,16 +40,16 @@ NADE_CONSTS = ["--theano",
                "--samples_name", "data",
                "--hlayers", "2",  # 2 hidden layers
                "--layerwise",
-               "--lr", "0.02",  # learning rate
-               "--wd", "0.02",  # weight decay
+               "--lr", "0.002",  # learning rate
+               "--wd", "0.002",  # weight decay
                "--n_components", "10",  # number of GMM components
                "--epoch_size", "100",
                "--momentum", "0.9",
                "--units", "100",  # units in hidden layer (I think)
                "--pretraining_epochs", "5",
-               "--validation_loops", "20",
-               "--epochs", "18",  # number of epochs
-               "--normalize",
+               "--validation_loops", "40",
+               "--epochs", "100",  # number of epochs
+               "--normalize", "True",
                "--batch_size", "32",
                "--show_training_stop", "True"]
 # Other params
@@ -59,6 +64,23 @@ def get_class_nade(class_name):
     class_args.insert(4, class_name.replace(" ", "_") + "X.hdf5")
     options, args = parser.parse_args(class_args)
     nade = train_NADE(options, args)
+
+    if options.show_training_stop:
+        print("\n\n Training Stop Print Out for    " + class_name)
+        dataset_file = data_path + options.dataset
+        training_dataset = Data.BigDataset(
+            dataset_file, options.training_route, options.samples_name)
+        testing_dataset = Data.BigDataset(
+            dataset_file, options.test_route, options.samples_name)
+
+        training_likelihood = nade.estimate_loglikelihood_for_dataset(
+            training_dataset)
+        testing_likelihood = nade.estimate_loglikelihood_for_dataset(
+            testing_dataset)
+        print("Training log likelihood " + str(training_likelihood))
+        print("Testing log likelihood " + str(testing_likelihood))
+        print("\n\n")
+
     return nade
 
 
@@ -91,7 +113,7 @@ if __name__ == "__main__":
     Create NADE per class.
     """
     # classes = ['Unspecified Ia', 'Unspecified Ia Pec', 'Ia-91T', 'Ia-91bg', 'Ib/c', 'Unspecified Ib', 'IIb', 'Unspecified Ic', 'Ic Pec', 'Unspecified II', 'II P', 'IIn', 'TDE', 'GRB']
-    classes = ['Unspecified Ia', 'Unspecified II']
+    classes = ['TDE', 'Unspecified Ia', 'Unspecified II']
     class_nades = {}
     for class_name in classes:
         print("\nTraining NADE for class " + str(class_name))

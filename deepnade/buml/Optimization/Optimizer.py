@@ -98,6 +98,7 @@ class Optimizer(Instrumentable):
         self.run_instrumentation()
         self.finished = reduce(lambda t, c: t or c.after_training_iteration(
             self), self.controllers, False)
+        # print(self.get_training_loss())
 
     def get_parameters(self):
         ''' Returns a dictionary with all the training method parameters '''

@@ -113,28 +113,29 @@ def train_NADE(options, args):
         hdf5_backend.write([], "normalisation/mean", mean)
         hdf5_backend.write([], "normalisation/std", std)
     l = 1 if options.layerwise else options.hlayers
+
     if options.form == "MoG":
         nade_class = NADE.MoGNADE
         nade = nade_class(n_visible, options.units, options.n_components,
                           nonlinearity=options.nonlinearity)
         loss_function = "sym_neg_loglikelihood_gradient"
-        validation_loss_measurement = Instrumentation.Function(
-            "validation_loss", lambda ins: -ins.model.estimate_loglikelihood_for_dataset(validation_dataset))
+
     elif options.form == "Laplace":
         nade_class = NADE.MoLaplaceNADE
         nade = nade_class(n_visible, options.units, options.n_components,
                           nonlinearity=options.nonlinearity)
         loss_function = "sym_neg_loglikelihood_gradient"
-        validation_loss_measurement = Instrumentation.Function(
-            "validation_loss", lambda ins: -ins.model.estimate_loglikelihood_for_dataset(validation_dataset))
     elif options.form == "Bernoulli":
         nade_class = NADE.BernoulliNADE
         nade = nade_class(n_visible, options.units, nonlinearity=options.nonlinearity)
         loss_function = "sym_neg_loglikelihood_gradient"
-        validation_loss_measurement = Instrumentation.Function(
-            "validation_loss", lambda ins: -ins.model.estimate_loglikelihood_for_dataset(validation_dataset))
     else:
         raise Exception("Unknown form")
+
+    val_loss_func = lambda ins: - \
+        ins.model.estimate_loglikelihood_for_dataset(validation_dataset)
+    validation_loss_measurement = Instrumentation.Function(name="validation_loss",
+                                                           f=val_loss_func)
     #------------------------------------------------------------------------------
     # Training
     nade.initialize_parameters_from_dataset(training_dataset)
@@ -150,17 +151,25 @@ def train_NADE(options, args):
         options.lr, options.decrease_constant))
     # trainer.add_controller(TrainingController.AdaptiveLearningRate(options.lr, 0, epochs=options.epochs))
     trainer.add_controller(TrainingController.MaxIterations(options.epochs))
-    if options.training_ll_stop < np.inf:
-        # Assumes that we're doing minimization so negative ll
-        trainer.add_controller(
-            TrainingController.TrainingErrorStop(-options.training_ll_stop))
+
+    # if options.training_ll_stop < np.inf:
+    # Assumes that we're doing minimization so negative ll
+    # trainer.add_controller(
+    #     TrainingController.TrainingErrorStop(-options.training_ll_stop))
+
+    # Add early stopping when training does better than validation
+
+    trainer.add_controller(
+        TrainingController.ValEarlyStopping(nade, validation_dataset))
+
     trainer.add_controller(TrainingController.ConfigurationSchedule(
         "momentum", [(2, 0), (float('inf'), options.momentum)]))
     trainer.set_updates_per_epoch(options.epoch_size)
     trainer.set_minibatch_size(options.batch_size)
 #    trainer.set_weight_decay_rate(options.wd)
     trainer.add_controller(TrainingController.NaNBreaker())
-    # Instrument the training
+
+    # Print out information
     trainer.add_instrumentation(Instrumentation.Instrumentation([console, textfile_log, hdf5_backend],
                                                                 Instrumentation.Function("training_loss", lambda ins: ins.get_training_loss())))
     if not options.no_validation:
@@ -171,9 +180,10 @@ def train_NADE(options, args):
                                                                     at_lowest=[Instrumentation.Parameters()]))
     trainer.add_instrumentation(Instrumentation.Instrumentation(
         [console, textfile_log, hdf5_backend], Instrumentation.Configuration()))
-    # trainer.add_instrumentation(Instrumentation.Instrumentation([hdf5_backend], Instrumentation.Parameters(), every = 10))
+
     trainer.add_instrumentation(Instrumentation.Instrumentation(
         [console, textfile_log, hdf5_backend], Instrumentation.Timestamp()))
+
     # Train
     trainer.train()
     #------------------------------------------------------------------------------

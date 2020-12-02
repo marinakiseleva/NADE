@@ -3,6 +3,7 @@ from .LinearConfigurationSchedule import LinearConfigurationSchedule
 from .AdaptiveLearningRate import AdaptiveLearningRate
 from .MaxIterations import MaxIterations
 from .TrainingErrorStop import TrainingErrorStop
+from .ValEarlyStopping import ValEarlyStopping
 from .NaNBreaker import NaNBreaker
 from .EarlyStopping import EarlyStopping
 from .MontrealLearningRate import MontrealLearningRate
