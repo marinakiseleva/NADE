@@ -63,6 +63,11 @@ class SGD(Epochable, Optimizer):
         return step_loss, gradient, updates
 
     def compile_optimization_step(self, *params):
+        """
+
+        theano.shared variable object lets us share symbolic variable between functions. It's name is
+        training_loss. 
+        """
         # LL accumulator for each epoch
         self.training_loss = theano.shared(
             np.array(0.0, dtype=theano.config.floatX), "training_loss")  # @UndefinedVariable

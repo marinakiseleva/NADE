@@ -15,11 +15,13 @@ class ValEarlyStopping(TrainingController):
         self.nade = nade
         self.validation_dataset = validation_dataset
         self.training_dataset = training_dataset
+        self.last_X = []
+        self.X = 10
 
     def after_training_iteration(self, trainable):
 
-        if trainable.epoch < 5:
-            print("don't count this")
+        if trainable.epoch < 10:
+            print("Don't count this")
             return False
 
         ll_validation = self.nade.estimate_loglikelihood_for_dataset(
@@ -31,6 +33,10 @@ class ValEarlyStopping(TrainingController):
         print("\nValidation ll" + str(ll_validation) +
               "\nTraining ll" + str(ll_training) + "\n\n")
 
-        # Stop when training likelihood is better than validation
-        if ll_training > ll_validation:
+        # Note when validation likelihood is better than training
+        if ll_training < ll_validation:
+            self.last_X.append(True)
+
+        # When it happens last_X times, stop.
+        if len(self.last_X) >= self.X:
             return True
