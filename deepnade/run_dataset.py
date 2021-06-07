@@ -49,9 +49,9 @@ NADE_CONSTS = ["--theano",
                "--units", "100",  # units in hidden layer (I think)
                # "--pretraining_epochs", "5",
                # "--validation_loops", "20", # for orderless NADE
-               "--epochs", "20",  # maximum number of epochs
+               "--epochs", "100",  # maximum number of epochs
                # "--normalize", "False",
-               "--batch_size", "32",
+               "--batch_size", "16",
                "--show_training_stop", "True"]
 # Other params
 # Nonlinearity function defaults to ReLU
@@ -227,7 +227,8 @@ if __name__ == "__main__":
     ########################################################
 
     # THEx Data
-    # classes = ['Unspecified Ia', 'Unspecified II']
+    classes = ['Unspecified Ia', 'Unspecified II']
+    dataset_name = "thex"
     # classes = ['Unspecified Ia', 'Unspecified Ia Pec', 'Ia-91T', 'Ia-91bg', 'Ib/c', 'Unspecified Ib', 'IIb', 'Unspecified Ic', 'Ic Pec', 'Unspecified II', 'II P', 'IIn', 'TDE', 'GRB']
     # classes = ['TDE', 'Unspecified Ia', 'Unspecified II']
 
@@ -235,11 +236,12 @@ if __name__ == "__main__":
     # classes = ['dog', 'cat', 'mouse']
 
     # WINE DATASET
-    classes = ["4", "5", "6", "7"]
-    dataset_name = "wine"
+    # classes = ["4", "5", "6", "7"]
+    # dataset_name = "wine"
     runs = 10
 
     ########################################################
+
     all_ps = []
     all_accs = []
     for i in range(runs):
